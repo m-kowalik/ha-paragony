@@ -1,16 +1,27 @@
 """Okresowa synchronizacja paragonów do bazy."""
 from __future__ import annotations
 
+import asyncio
+from datetime import datetime, timedelta
 import logging
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
-from .const import CONF_REFRESH_TOKEN, DOMAIN, EVENT_NEW_RECEIPT, UPDATE_INTERVAL
+from .const import (
+    CONF_REFRESH_TOKEN,
+    CONF_TODO_ENTITY,
+    DOMAIN,
+    EVENT_NEW_RECEIPT,
+    EVENT_RESTOCK_ADDED,
+    RECENT_DAYS,
+    UPDATE_INTERVAL,
+)
 from .db import ReceiptDB
+from .restock import evaluate
 from .providers.base import ProviderAuthError, ProviderError, ReceiptProvider
 
 _LOGGER = logging.getLogger(__name__)
@@ -29,6 +40,7 @@ class ParagonyCoordinator(DataUpdateCoordinator[dict]):
         )
         self.provider = provider
         self.db = db
+        self._restock_lock = asyncio.Lock()
 
     async def _async_update_data(self) -> dict:
         chain = self.provider.chain
@@ -67,7 +79,70 @@ class ParagonyCoordinator(DataUpdateCoordinator[dict]):
             self._persist_refresh_token()
 
         month_start = dt_util.start_of_local_day().replace(day=1)
-        return await self.hass.async_add_executor_job(self.db.stats, chain, month_start)
+        data = await self.hass.async_add_executor_job(self.db.stats, chain, month_start)
+        data["restock"], data["recent"] = await self._async_restock()
+        return data
+
+    async def async_update_restock(self) -> None:
+        """Przelicza terminy zakupów bez odpytywania API sieci (timer, zmiana interwału)."""
+        if self.data is None:
+            return
+        restock, recent = await self._async_restock()
+        # celowo bez async_set_updated_data — ta przesuwa termin kolejnej synchronizacji
+        self.data = {**self.data, "restock": restock, "recent": recent}
+        self.async_update_listeners()
+
+    async def _async_restock(self) -> tuple[dict[int, dict], list[dict]]:
+        async with self._restock_lock:
+            now = dt_util.now()
+            products = await self.hass.async_add_executor_job(self.db.list_tracked, self.config_entry.entry_id)
+            recent = await self.hass.async_add_executor_job(
+                self.db.recent_products, 50, now - timedelta(days=RECENT_DAYS)
+            )
+            todo_entity = self.config_entry.options.get(CONF_TODO_ENTITY)
+            restock: dict[int, dict] = {}
+            for product in products:
+                state = evaluate(product, now)
+                if state.should_add and todo_entity and await self._async_add_to_list(todo_entity, product, now):
+                    product["last_added_at"] = now.isoformat()
+                restock[product["id"]] = {**product, "due_date": state.due_date, "days_left": state.days_left}
+            return restock, recent
+
+    async def _async_add_to_list(self, todo_entity: str, product: dict, now: datetime) -> bool:
+        """Dodaje produkt do listy zakupów, chyba że już na niej czeka. Zwraca True, gdy cykl obsłużony."""
+        name = product["name"]
+        try:
+            response = await self.hass.services.async_call(
+                "todo",
+                "get_items",
+                {"entity_id": todo_entity, "status": ["needs_action"]},
+                blocking=True,
+                return_response=True,
+            )
+            items = (response or {}).get(todo_entity, {}).get("items", [])
+            already_on_list = any(item.get("summary", "").casefold() == name.casefold() for item in items)
+            if not already_on_list:
+                last = dt_util.as_local(datetime.fromisoformat(product["last_purchased_at"]))
+                await self.hass.services.async_call(
+                    "todo",
+                    "add_item",
+                    {
+                        "entity_id": todo_entity,
+                        "item": name,
+                        "description": f"Paragony: ostatnio kupione {last:%d.%m}, co {product['interval_days']} dni",
+                    },
+                    blocking=True,
+                )
+        except HomeAssistantError as err:
+            _LOGGER.warning("Nie udało się dodać „%s” do %s: %s", name, todo_entity, err)
+            return False
+        await self.hass.async_add_executor_job(self.db.mark_added, product["id"], now)
+        self.hass.bus.async_fire(
+            EVENT_RESTOCK_ADDED,
+            {"product": name, "todo_entity": todo_entity, "already_on_list": already_on_list},
+        )
+        _LOGGER.info("„%s” → %s (już na liście: %s)", name, todo_entity, already_on_list)
+        return True
 
     def _persist_refresh_token(self) -> None:
         token = self.provider.refresh_token

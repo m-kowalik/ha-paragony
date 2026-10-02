@@ -39,6 +39,17 @@
       },
       "receipt_count": {
         "name": "Liczba paragonów"
+      },
+      "recent_products": {
+        "name": "Ostatnio kupione (30 dni)"
+      },
+      "restock_due": {
+        "name": "{product} — kup ponownie"
+      }
+    },
+    "number": {
+      "restock_interval": {
+        "name": "{product} — co ile dni"
       }
     }
   },
@@ -76,6 +87,68 @@
     "sync": {
       "name": "Synchronizuj",
       "description": "Pobiera nowe paragony ze wszystkich kont."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Paragony",
+        "menu_options": {
+          "todo_list": "Lista zakupów (Bring)",
+          "add_product": "Dodaj produkt kupowany cyklicznie",
+          "edit_product": "Edytuj produkt",
+          "remove_products": "Usuń produkty"
+        }
+      },
+      "todo_list": {
+        "title": "Lista zakupów",
+        "description": "Lista, do której trafią produkty, gdy minie czas od ostatniego zakupu.",
+        "data": {
+          "todo_entity": "Lista"
+        }
+      },
+      "add_product": {
+        "title": "Dodaj produkt",
+        "description": "Wybierz nazwy z paragonów, które oznaczają ten sam produkt (np. różne smaki lub pojemności).",
+        "data": {
+          "item_names": "Produkty z paragonów"
+        }
+      },
+      "add_details": {
+        "title": "Szczegóły produktu",
+        "description": "Z paragonów: {items}\nSugestia z historii zakupów: {suggested} dni.",
+        "data": {
+          "name": "Nazwa na liście zakupów",
+          "interval_days": "Co ile dni kupować"
+        }
+      },
+      "edit_product": {
+        "title": "Edytuj produkt",
+        "data": {
+          "product": "Produkt"
+        }
+      },
+      "edit_details": {
+        "title": "Edytuj: {product}",
+        "data": {
+          "name": "Nazwa na liście zakupów",
+          "interval_days": "Co ile dni kupować",
+          "item_names": "Produkty z paragonów"
+        }
+      },
+      "remove_products": {
+        "title": "Usuń produkty",
+        "data": {
+          "products": "Produkty do usunięcia"
+        }
+      }
+    },
+    "error": {
+      "no_items": "Wybierz co najmniej jeden produkt.",
+      "name_exists": "Produkt o tej nazwie już istnieje."
+    },
+    "abort": {
+      "not_loaded": "Integracja nie jest uruchomiona — sprawdź logowanie."
     }
   }
 }

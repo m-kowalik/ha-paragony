@@ -21,6 +21,13 @@ Custom integration Home Assistant pobierająca e-paragony z aplikacji sieci hand
 - `__init__.py`:
   - akcje `paragony.search` (`SupportsResponse.ONLY`; filtry: `product`, `date_from`/`date_to` w lokalnej strefie, `chain`, `include_deposits`, `limit`) i `paragony.sync`;
   - jedna wspólna instancja bazy w `hass.data[DOMAIN]["db"]`.
+- Produkty cykliczne (od 0.2):
+  - tabele `tracked_products` i `tracked_product_names` (nazwa na liście zakupów ↔ nazwy z paragonów; ostatni zakup liczony ze wszystkich sieci);
+  - `restock.py` (`evaluate`, czysta logika: termin = ostatni zakup + `interval_days`; dodanie **raz na cykl**, czyli tylko gdy `last_added_at < last_purchased_at`);
+  - `coordinator._async_restock` (`todo.get_items`, potem `todo.add_item`, `mark_added`, event `paragony_restock_added`), wołane po synchronizacji, co godzinę i po zmianie `number`;
+  - `async_update_restock` celowo nie używa `async_set_updated_data`, bo ta przesuwa termin synchronizacji;
+  - `entity.py` (`RestockEntity`, urządzenie „Zakupy cykliczne”), `number.py` (dni) i `RestockSensor` (data);
+  - produkty są w bazie, nie w `entry.options` (tam tylko `todo_entity`). `OptionsFlow` po zmianie robi `async_schedule_reload`, a przy usuwaniu kasuje encje z rejestru.
 - `config_flow.py`: numer telefonu → kod SMS → `entry.data = {chain, phone, refresh_token}`. `unique_id` ma postać `zabka_<numer>`. Ma też krok reauth.
 
 ## Nieoficjalne API Żappki

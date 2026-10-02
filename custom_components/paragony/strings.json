@@ -39,6 +39,17 @@
       },
       "receipt_count": {
         "name": "Receipt count"
+      },
+      "recent_products": {
+        "name": "Recently bought (30 days)"
+      },
+      "restock_due": {
+        "name": "{product} — buy again"
+      }
+    },
+    "number": {
+      "restock_interval": {
+        "name": "{product} — every N days"
       }
     }
   },
@@ -76,6 +87,68 @@
     "sync": {
       "name": "Synchronize",
       "description": "Fetches new receipts for all accounts."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Paragony",
+        "menu_options": {
+          "todo_list": "Shopping list (Bring)",
+          "add_product": "Add a recurring product",
+          "edit_product": "Edit product",
+          "remove_products": "Remove products"
+        }
+      },
+      "todo_list": {
+        "title": "Shopping list",
+        "description": "List that products are added to when their restock time has passed.",
+        "data": {
+          "todo_entity": "List"
+        }
+      },
+      "add_product": {
+        "title": "Add product",
+        "description": "Select receipt names that mean the same product (e.g. flavours or sizes).",
+        "data": {
+          "item_names": "Receipt products"
+        }
+      },
+      "add_details": {
+        "title": "Product details",
+        "description": "From receipts: {items}\nSuggested from purchase history: {suggested} days.",
+        "data": {
+          "name": "Name on the shopping list",
+          "interval_days": "Buy every N days"
+        }
+      },
+      "edit_product": {
+        "title": "Edit product",
+        "data": {
+          "product": "Product"
+        }
+      },
+      "edit_details": {
+        "title": "Edit: {product}",
+        "data": {
+          "name": "Name on the shopping list",
+          "interval_days": "Buy every N days",
+          "item_names": "Receipt products"
+        }
+      },
+      "remove_products": {
+        "title": "Remove products",
+        "data": {
+          "products": "Products to remove"
+        }
+      }
+    },
+    "error": {
+      "no_items": "Select at least one product.",
+      "name_exists": "A product with this name already exists."
+    },
+    "abort": {
+      "not_loaded": "The integration is not running — check the login."
     }
   }
 }

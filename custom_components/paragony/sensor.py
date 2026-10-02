@@ -19,6 +19,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from . import ParagonyConfigEntry
 from .const import CHAIN_NAMES, CONF_CHAIN, DOMAIN
 from .coordinator import ParagonyCoordinator
+from .entity import RestockEntity
 
 
 def _last(data: dict) -> dict | None:
@@ -73,6 +74,21 @@ SENSORS: tuple[ParagonySensorDescription, ...] = (
         attrs_fn=lambda d: {"receipts": d["month_count"]},
     ),
     ParagonySensorDescription(
+        key="recent_products",
+        translation_key="recent_products",
+        value_fn=lambda d: len(d.get("recent", [])),
+        attrs_fn=lambda d: {
+            "products": [
+                {
+                    "name": p["name"],
+                    "last_purchased_at": p["last_purchased_at"],
+                    "times": p["times"],
+                }
+                for p in d.get("recent", [])
+            ]
+        },
+    ),
+    ParagonySensorDescription(
         key="receipt_count",
         translation_key="receipt_count",
         state_class=SensorStateClass.TOTAL_INCREASING,
@@ -85,7 +101,9 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ParagonyConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     coordinator = entry.runtime_data
-    async_add_entities(ParagonySensor(coordinator, entry, desc) for desc in SENSORS)
+    entities: list[SensorEntity] = [ParagonySensor(coordinator, entry, desc) for desc in SENSORS]
+    entities += [RestockSensor(coordinator, entry, pid) for pid in coordinator.data.get("restock", {})]
+    async_add_entities(entities)
 
 
 class ParagonySensor(CoordinatorEntity[ParagonyCoordinator], SensorEntity):
@@ -113,3 +131,28 @@ class ParagonySensor(CoordinatorEntity[ParagonyCoordinator], SensorEntity):
     @property
     def extra_state_attributes(self) -> dict:
         return self.entity_description.attrs_fn(self.coordinator.data)
+
+
+class RestockSensor(RestockEntity, SensorEntity):
+    """Data, kiedy kupić produkt ponownie."""
+
+    _attr_device_class = SensorDeviceClass.DATE
+    _attr_translation_key = "restock_due"
+    _key = "due"
+
+    @property
+    def native_value(self):
+        return self.product["due_date"] if self.product else None
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        product = self.product
+        if product is None:
+            return {}
+        return {
+            "last_purchased_at": product["last_purchased_at"],
+            "days_left": product["days_left"],
+            "interval_days": product["interval_days"],
+            "receipt_names": product["item_names"],
+            "added_to_list_at": product["last_added_at"],
+        }

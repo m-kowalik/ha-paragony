@@ -102,3 +102,89 @@ async def test_auth_error_starts_reauth(hass: HomeAssistant) -> None:
     assert entry.state is ConfigEntryState.SETUP_ERROR
     flows = hass.config_entries.flow.async_progress()
     assert flows and flows[0]["context"]["source"] == "reauth"
+
+
+async def test_options_restock_adds_to_todo(hass: HomeAssistant, zabka_fixture) -> None:
+    from homeassistant.core import SupportsResponse
+    from homeassistant.helpers import entity_registry as er
+
+    receipt = build_receipt(zabka_fixture["eprint"], zabka_fixture["receipt"])
+    entry = MockConfigEntry(
+        domain=DOMAIN, unique_id="zabka_600100200", data={"chain": "zabka", "phone": "600100200", "refresh_token": "x"}
+    )
+    entry.add_to_hass(hass)
+
+    added: list[dict] = []
+    on_list: list[str] = ["mleko 3,2% 1l"]  # już czeka na liście (inna wielkość liter)
+
+    async def get_items(call):
+        return {call.data["entity_id"]: {"items": [{"summary": s, "status": "needs_action"} for s in on_list]}}
+
+    async def add_item(call):
+        added.append(dict(call.data))
+        on_list.append(call.data["item"])
+
+    hass.services.async_register("todo", "get_items", get_items, supports_response=SupportsResponse.ONLY)
+    hass.services.async_register("todo", "add_item", add_item)
+
+    with (
+        patch(f"{PROVIDER}.async_list_receipt_ids", AsyncMock(return_value=[receipt.external_id])),
+        patch(f"{PROVIDER}.async_get_receipt", AsyncMock(return_value=receipt)),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+        recent = hass.states.get("sensor.zabka_recently_bought_30_days")
+        assert recent is not None
+        # zakup z fixture jest starszy niż 30 dni
+        assert recent.state == "0"
+
+        flow = await hass.config_entries.options.async_init(entry.entry_id)
+        assert flow["type"] is FlowResultType.MENU and "edit_product" not in flow["menu_options"]
+        flow = await hass.config_entries.options.async_configure(flow["flow_id"], {"next_step_id": "todo_list"})
+        flow = await hass.config_entries.options.async_configure(flow["flow_id"], {"todo_entity": "todo.zakupy"})
+        assert flow["type"] is FlowResultType.CREATE_ENTRY
+        await hass.async_block_till_done()
+        assert entry.options["todo_entity"] == "todo.zakupy"
+
+        for names, name in ((["CHIPSY SOLONE 140g"], None), (["MLEKO 3,2% 1l"], "Mleko 3,2% 1l")):
+            flow = await hass.config_entries.options.async_init(entry.entry_id)
+            flow = await hass.config_entries.options.async_configure(flow["flow_id"], {"next_step_id": "add_product"})
+            flow = await hass.config_entries.options.async_configure(flow["flow_id"], {"item_names": names})
+            assert flow["step_id"] == "add_details"
+            details = {"interval_days": 7} | ({"name": name} if name else {})
+            schema_defaults = {str(k): k.default() for k in flow["data_schema"].schema if hasattr(k, "default")}
+            flow = await hass.config_entries.options.async_configure(
+                flow["flow_id"], {"name": schema_defaults["name"]} | details
+            )
+            assert flow["type"] is FlowResultType.CREATE_ENTRY
+            await hass.async_block_till_done()
+
+    # Chipsy: zakup 15.01 + 7 dni minął → dodane raz; Mleko już było na liście → bez duplikatu
+    assert [a["item"] for a in added] == ["Chipsy solone 140g"]
+    assert added[0]["entity_id"] == "todo.zakupy"
+    assert added[0]["description"] == "Paragony: ostatnio kupione 15.01, co 7 dni"
+
+    coordinator = entry.runtime_data
+    await coordinator.async_update_restock()
+    assert len(added) == 1  # tylko raz na cykl
+
+    registry = er.async_get(hass)
+    entities = {e.unique_id: e.entity_id for e in er.async_entries_for_config_entry(registry, entry.entry_id)}
+    chips_id = next(pid for pid, p in coordinator.data["restock"].items() if p["name"] == "Chipsy solone 140g")
+    number_id = entities[f"{entry.entry_id}_product_{chips_id}_interval"]
+    sensor_id = entities[f"{entry.entry_id}_product_{chips_id}_due"]
+    assert hass.states.get(sensor_id).state == "2026-01-22"
+    assert hass.states.get(sensor_id).attributes["added_to_list_at"] is not None
+
+    await hass.services.async_call("number", "set_value", {"entity_id": number_id, "value": 30}, blocking=True)
+    await hass.async_block_till_done()
+    assert hass.states.get(number_id).state == "30"
+    assert hass.states.get(sensor_id).state == "2026-02-14"
+
+    flow = await hass.config_entries.options.async_init(entry.entry_id)
+    flow = await hass.config_entries.options.async_configure(flow["flow_id"], {"next_step_id": "remove_products"})
+    flow = await hass.config_entries.options.async_configure(flow["flow_id"], {"products": [str(chips_id)]})
+    await hass.async_block_till_done()
+    assert registry.async_get(number_id) is None and registry.async_get(sensor_id) is None
+    assert await hass.config_entries.async_unload(entry.entry_id)

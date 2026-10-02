@@ -7,9 +7,10 @@ import voluptuous as vol
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse
+from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse, callback
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.util import dt as dt_util
 
@@ -20,6 +21,7 @@ from .const import (
     CONF_REFRESH_TOKEN,
     DB_FILENAME,
     DOMAIN,
+    RESTOCK_INTERVAL,
     SERVICE_SEARCH,
     SERVICE_SYNC,
 )
@@ -27,7 +29,7 @@ from .coordinator import ParagonyCoordinator
 from .db import ReceiptDB
 from .providers.zabka import ZabkaProvider
 
-PLATFORMS = [Platform.SENSOR]
+PLATFORMS = [Platform.NUMBER, Platform.SENSOR]
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 DATA_DB = "db"
 
@@ -116,7 +118,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ParagonyConfigEntry) -> 
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
+    @callback
+    def _restock_tick(_now) -> None:
+        entry.async_create_background_task(hass, coordinator.async_update_restock(), "paragony_restock")
+
+    entry.async_on_unload(async_track_time_interval(hass, _restock_tick, RESTOCK_INTERVAL))
+    entry.async_on_unload(entry.add_update_listener(_async_options_updated))
     return True
+
+
+async def _async_options_updated(hass: HomeAssistant, entry: ParagonyConfigEntry) -> None:
+    await hass.config_entries.async_reload(entry.entry_id)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ParagonyConfigEntry) -> bool:

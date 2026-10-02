@@ -22,6 +22,21 @@ Przy pierwszej synchronizacji importowana jest cała dostępna historia, potem c
 | `sensor.zabka_data_ostatniego_zakupu` | znacznik czasu ostatniego zakupu |
 | `sensor.zabka_wydatki_w_tym_miesiacu` | suma paragonów od 1. dnia miesiąca (atrybut `receipts`) |
 | `sensor.zabka_liczba_paragonow` | liczba paragonów w bazie |
+| `sensor.zabka_ostatnio_kupione_30_dni` | liczba różnych produktów z 30 dni; atrybut `products` (nazwa, ostatni zakup, ile razy) |
+
+## Produkty kupowane cyklicznie → lista zakupów (np. Bring)
+Ustawienia → Paragony → **Konfiguruj**:
+1. **Lista zakupów** — wybierz encję `todo` (np. listę Bring).
+2. **Dodaj produkt kupowany cyklicznie** — zaznacz nazwy z paragonów oznaczające ten sam produkt,
+   podaj nazwę na liście zakupów i co ile dni go kupujesz (podpowiedź liczona z historii zakupów).
+
+Dla każdego produktu powstają encje w urządzeniu „Zakupy cykliczne”:
+- `number.zakupy_cykliczne_<produkt>_co_ile_dni` — edytowalne z dashboardu,
+- `sensor.zakupy_cykliczne_<produkt>_kup_ponownie` — data (atrybuty: ostatni zakup, dni do zakupu, nazwy z paragonów, kiedy dodano do listy).
+
+Gdy od ostatniego zakupu minie ustawiona liczba dni, produkt jest dodawany do listy (sprawdzane co godzinę
+i po każdej synchronizacji) — **raz na cykl**: kolejne dodanie dopiero po nowym paragonie z tym produktem.
+Jeśli produkt już czeka na liście, nie jest dublowany. Po dodaniu wysyłany jest event `paragony_restock_added`.
 
 ## Akcje
 **`paragony.search`** (zwraca odpowiedź) — pozycje z paragonów, od najnowszych:
