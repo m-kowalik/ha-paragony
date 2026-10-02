@@ -68,7 +68,13 @@ Klient OAuth `LidlPlusNativeClient` (sekret `secret`, Basic auth), `redirect_uri
 4. Dopisz sieć do selektora `chain` w `services.yaml` oraz do tłumaczeń (`strings.json`, `translations/*.json`).
 
 Tropy:
-- **Biedronka:** moja.biedronka.pl pozwala pobrać e-paragony jako JSON, prawdopodobnie w tym samym formacie JPK. Endpointy i logowanie trzeba dopiero rozpoznać.
+- **Biedronka (Moja Biedronka)**, rozpoznane 2026-10-02 na podstawie `Przemko92/home-assistant-mojabiedronka` i `aqbifzl/biedronka-cli`:
+  - Logowanie: Keycloak `https://konto.biedronka.pl/realms/loyalty/protocol/openid-connect/{auth,token}`, publiczny klient `cma20` (bez sekretu, `client_id` w treści), PKCE, `redirect_uri` `app://cma20.biedronka.pl`. W przeglądarce: telefon → Cloudflare Turnstile → SMS. Kod jest ważny około minuty. Access token żyje 24 h, refresh token 120 dni i rotuje.
+  - Cloudflare przed Keycloakiem odrzuca domyślny User-Agent (`403 error code: 1010`), więc trzeba wysyłać przeglądarkowy UA.
+  - API `https://api.prod.biedronka.cloud/api/v7` (`User-Agent: Android/2.22.2`, `Bearer`):
+    - `transactions/?page=N` zwraca `transactions`, `page_count`, a w transakcjach `id`, `date`, `total_price`, `store_name`, `receipt_num` i `is_e_receipt_available`;
+    - `transactions/<id>/e-receipt/` z nagłówkiem `output-format: json` zwraca linie `sellLine`, `discountLine`, `discountSummary`, `vatSummary`, `sumInCurrency`. To nie JPK. Czasem daje 404, wtedy fallback na `transactions/<id>/` (`items`).
+  - Stan: logowanie działa (`tools/biedronka_discover.py`), ale konto nie ma jeszcze transakcji, a `users/me` zwraca `electronic_carrier: null`. Formatu nie zweryfikowano na prawdziwych danych.
 
 ## Testy
 ```bash
@@ -81,6 +87,7 @@ python3 -m venv .venv && .venv/bin/pip install pytest-homeassistant-custom-compo
 
 ## Narzędzia
 - `tools/zabka_discover.py`: ręczne rozpoznawanie API (`send`, `verify`, `introspect`, `probe`, `query`). Tokeny trafiają do `.secrets/` (gitignored, chmod 600).
+- `tools/biedronka_discover.py`: `url`, `code <adres>`, `list`, `fetch [N]`. Wyniki trafiają do `.secrets/biedronka/`.
 - `tools/lidl_discover.py`: `url` (link PKCE), `code <adres>`, `list`, `fetch [N]`. Paragony trafiają do `.secrets/lidl/`.
 
 ## Konwencje
