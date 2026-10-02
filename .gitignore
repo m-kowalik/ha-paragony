@@ -3,3 +3,4 @@ __pycache__/
 *.pyc
 .venv/
 tests/fixtures/raw/
+CLAUDE.local.md
