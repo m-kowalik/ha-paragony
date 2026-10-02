@@ -7,9 +7,11 @@ CONF_CHAIN = "chain"
 CONF_PHONE = "phone"
 CONF_CODE = "code"
 CONF_REFRESH_TOKEN = "refresh_token"
+CONF_CALLBACK_URL = "callback_url"
 
 CHAIN_ZABKA = "zabka"
-CHAIN_NAMES = {CHAIN_ZABKA: "Żabka"}
+CHAIN_LIDL = "lidl"
+CHAIN_NAMES = {CHAIN_ZABKA: "Żabka", CHAIN_LIDL: "Lidl"}
 
 DB_FILENAME = "paragony.db"
 UPDATE_INTERVAL = timedelta(hours=6)

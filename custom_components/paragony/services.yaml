@@ -15,6 +15,7 @@ search:
         select:
           options:
             - zabka
+            - lidl
     include_deposits:
       default: false
       selector:

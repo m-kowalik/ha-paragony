@@ -1,0 +1,105 @@
+{
+  "html": {
+    "ticketType": "HTML",
+    "id": "240000000020260115000001",
+    "date": "2026-01-15T12:00:00",
+    "totalAmount": 27.99,
+    "store": {
+      "id": "PL0000",
+      "name": "Warszawa, ul. Testowa 1",
+      "address": "ul. Testowa 1",
+      "postalCode": "00-001",
+      "locality": "Warszawa",
+      "schedule": ""
+    },
+    "languageCode": "pl",
+    "couponsUsed": [],
+    "htmlPrintedReceipt": "<html><head><meta http-equiv=\"content-type\" content=\"text/html; charset=UTF-8\"/></head><body><pre>\n<span class=\"header\" data-till-country=\"PL\" data-receipt-language=\"pl\"><span id=\"header_line_1\"></span>\n<span id=\"header_line_2\"> 00-001 Warszawa, ul. Testowa 1 </span>\n</span><span class=\"purchase_list\"><span id=\"purchase_list_line_1\" class=\"currency\" data-currency=\"zł\">2026-01-15</span>\n<span id=\"purchase_list_line_2\"></span>\n<span id=\"purchase_list_line_3\" class=\"article\" data-art-id=\"1000001\" data-art-quantity=\"6\" data-unit-price=\"2,00\" data-tax-type=\"A\" data-art-description=\"Woda mineralna 1,5l\">Woda mineralna 1,5l           </span>\n<span id=\"purchase_list_line_4\" class=\"article\" data-art-id=\"1000001\" data-art-quantity=\"6\" data-unit-price=\"2,00\" data-tax-type=\"A\" data-art-description=\"Woda mineralna 1,5l\">                       6 * 2.00 12.0 A</span>\n<span id=\"purchase_list_line_5\" class=\"discount\" data-promotion-id=\"1\">   6-sztuk                     -3,00</span>\n<span id=\"purchase_list_line_6\" class=\"article\" data-art-id=\"1000002\" data-art-quantity=\"0,500\" data-unit-price=\"24,00\" data-tax-type=\"C\" data-art-description=\"Filet z kurczaka\">Filet z kurczaka              </span>\n<span id=\"purchase_list_line_7\" class=\"article\" data-art-id=\"1000002\" data-art-quantity=\"0,500\" data-unit-price=\"24,00\" data-tax-type=\"C\" data-art-description=\"Filet z kurczaka\">                0,500kg x 24.0 12.0 C</span>\n<span id=\"purchase_list_line_8\" class=\"article\" data-art-id=\"1000003\" data-unit-price=\"3,99\" data-tax-type=\"C\" data-art-description=\"Śmietanka 30%\">Śmietanka 30%                 </span>\n<span id=\"purchase_list_line_9\" class=\"article\" data-art-id=\"1000003\" data-unit-price=\"3,99\" data-tax-type=\"C\" data-art-description=\"Śmietanka 30%\">                       1 * 3.99 3.99 C</span>\n</span><span class=\"vat_info\"><span id=\"vat_info_line_1\" data-tax-type=\"A\" data-tax-percentage=\"23,00\" data-tax-base-amount=\"9,00\" data-tax-amount=\"1,68\">PTU A 9,00</span>\n</span><span class=\"purchase_summary\"><span id=\"purchase_summary_1\" class=\"css_big\">Suma PLN</span><span id=\"purchase_summary_1\" class=\"css_big\">24,99</span>\n<span id=\"purchase_summary_2\">00 0000      nr:   000001        12:00</span>\n<span id=\"purchase_summary_3\">Opakowania zwrotne wydania             </span>\n<span id=\"purchase_summary_4\">   Kaucja PET              6 * 0.5 3.0</span>\n<span id=\"purchase_summary_5\">Opakowania zwrotne suma           3,00</span>\n<span id=\"purchase_summary_6\" class=\"css_big css_bold\">Suma</span><span id=\"purchase_summary_6\" class=\"css_big css_bold\">27,99</span>\n<span id=\"purchase_summary_7\" data-tender-description=\"Karta płatnicza\">Płatność         Karta płatnicza 27,99</span>\n</span>\n</pre></body></html>"
+  },
+  "native": {
+    "ticketType": "NATIVE",
+    "id": "240000000020250610000002",
+    "date": "2025-06-10T18:30:00",
+    "totalAmount": 14.47,
+    "totalAmountString": "14,47",
+    "currency": {
+      "code": "PLN",
+      "symbol": "zł"
+    },
+    "store": {
+      "id": "PL0000",
+      "name": "Warszawa, ul. Testowa 1",
+      "address": "ul. Testowa 1",
+      "postalCode": "00-001",
+      "locality": "Warszawa",
+      "schedule": ""
+    },
+    "operatorId": "0000",
+    "itemsLine": [
+      {
+        "currentUnitPrice": "6,99",
+        "quantity": "2",
+        "isWeight": false,
+        "originalAmount": "13,98",
+        "name": "Brokuły 500g",
+        "taxGroupName": "C",
+        "codeInput": "0000000000001",
+        "discounts": [
+          {
+            "description": "Lidl Plus rabat",
+            "amount": "7,00"
+          }
+        ],
+        "deposit": null,
+        "giftSerialNumber": null
+      },
+      {
+        "currentUnitPrice": "3,99",
+        "quantity": "0,250",
+        "isWeight": true,
+        "originalAmount": "1,00",
+        "name": "Marchew luz",
+        "taxGroupName": "C",
+        "codeInput": "0000000000002",
+        "discounts": [],
+        "deposit": null,
+        "giftSerialNumber": null
+      },
+      {
+        "currentUnitPrice": "5,99",
+        "quantity": "1",
+        "isWeight": false,
+        "originalAmount": "5,99",
+        "name": "Napój cola 2l.",
+        "taxGroupName": "A",
+        "codeInput": "0000000000003",
+        "discounts": [],
+        "deposit": {
+          "quantity": 1,
+          "taxGroupName": "H",
+          "amount": "0,50",
+          "description": "",
+          "unitPrice": "0,50"
+        },
+        "giftSerialNumber": null
+      }
+    ]
+  },
+  "tickets_page": {
+    "page": 1,
+    "size": 25,
+    "totalCount": 2,
+    "tickets": [
+      {
+        "id": "240000000020260115000001",
+        "date": "2026-01-15T12:00:00+00:00",
+        "totalAmount": 27.99
+      },
+      {
+        "id": "240000000020250610000002",
+        "date": "2025-06-10T18:30:00+00:00",
+        "totalAmount": 14.47
+      }
+    ]
+  }
+}

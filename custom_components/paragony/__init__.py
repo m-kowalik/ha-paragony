@@ -15,6 +15,7 @@ from homeassistant.helpers.typing import ConfigType
 from homeassistant.util import dt as dt_util
 
 from .const import (
+    CHAIN_LIDL,
     CHAIN_NAMES,
     CHAIN_ZABKA,
     CONF_CHAIN,
@@ -27,6 +28,7 @@ from .const import (
 )
 from .coordinator import ParagonyCoordinator
 from .db import ReceiptDB
+from .providers.lidl import LidlProvider
 from .providers.zabka import ZabkaProvider
 
 PLATFORMS = [Platform.NUMBER, Platform.SENSOR]
@@ -111,6 +113,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ParagonyConfigEntry) -> 
     chain = entry.data[CONF_CHAIN]
     if chain == CHAIN_ZABKA:
         provider = ZabkaProvider(session, entry.data[CONF_REFRESH_TOKEN])
+    elif chain == CHAIN_LIDL:
+        provider = LidlProvider(session, entry.data[CONF_REFRESH_TOKEN])
     else:
         raise ValueError(f"Nieobsługiwana sieć: {chain}")
 

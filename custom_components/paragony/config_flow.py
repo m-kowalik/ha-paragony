@@ -1,4 +1,4 @@
-"""Kreator konfiguracji: wybór sieci → numer telefonu → kod SMS."""
+"""Kreator konfiguracji: wybór sieci → Żabka: numer telefonu i kod SMS / Lidl: logowanie w przeglądarce."""
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -27,8 +27,10 @@ from homeassistant.helpers.selector import (
 from homeassistant.util import dt as dt_util
 
 from .const import (
+    CHAIN_LIDL,
     CHAIN_NAMES,
     CHAIN_ZABKA,
+    CONF_CALLBACK_URL,
     CONF_CHAIN,
     CONF_CODE,
     CONF_PHONE,
@@ -39,6 +41,7 @@ from .const import (
 )
 from .db import ReceiptDB
 from .providers.base import ProviderAuthError, ProviderError
+from .providers.lidl import LidlProvider, extract_code, generate_pkce, login_url
 from .providers.zabka import ZabkaProvider, normalize_phone
 from .restock import bring_name
 
@@ -62,10 +65,10 @@ class ParagonyConfigFlow(ConfigFlow, domain=DOMAIN):
     def __init__(self) -> None:
         self._provider: ZabkaProvider | None = None
         self._phone: str | None = None
+        self._pkce: tuple[str, str] | None = None
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
-        # na razie obsługiwana jest tylko Żabka; kolejne sieci dostaną własny krok
-        return await self.async_step_phone()
+        return self.async_show_menu(step_id="user", menu_options=["phone", "lidl"])
 
     async def async_step_phone(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         errors: dict[str, str] = {}
@@ -121,7 +124,45 @@ class ParagonyConfigFlow(ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
+    async def async_step_lidl(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        """Lidl Plus: logowanie na stronie Lidla, potem wklejenie adresu z kodem autoryzacji."""
+        errors: dict[str, str] = {}
+        if self._pkce is None:
+            self._pkce = generate_pkce()
+        verifier, challenge = self._pkce
+        if user_input is not None:
+            provider = LidlProvider(async_get_clientsession(self.hass))
+            try:
+                refresh_token = await provider.async_exchange_code(
+                    extract_code(user_input[CONF_CALLBACK_URL]), verifier
+                )
+            except ProviderAuthError:
+                errors[CONF_CALLBACK_URL] = "invalid_auth_code"
+            except ProviderError:
+                _LOGGER.exception("Logowanie do Lidl Plus nie powiodło się")
+                errors["base"] = "cannot_connect"
+            else:
+                await self.async_set_unique_id(f"{CHAIN_LIDL}_{provider.account_id}")
+                data = {CONF_CHAIN: CHAIN_LIDL, CONF_REFRESH_TOKEN: refresh_token}
+                if self.source == "reauth":
+                    self._abort_if_unique_id_mismatch(reason="wrong_account")
+                    return self.async_update_reload_and_abort(self._get_reauth_entry(), data=data)
+                self._abort_if_unique_id_configured()
+                return self.async_create_entry(title="Lidl Plus", data=data)
+            # kod autoryzacji jest jednorazowy — przy kolejnej próbie potrzebne nowe logowanie
+            self._pkce = generate_pkce()
+            challenge = self._pkce[1]
+
+        return self.async_show_form(
+            step_id="lidl",
+            data_schema=vol.Schema({vol.Required(CONF_CALLBACK_URL): str}),
+            description_placeholders={"url": login_url(challenge)},
+            errors=errors,
+        )
+
     async def async_step_reauth(self, entry_data: Mapping[str, Any]) -> ConfigFlowResult:
+        if entry_data.get(CONF_CHAIN) == CHAIN_LIDL:
+            return await self.async_step_lidl()
         self._phone = entry_data.get(CONF_PHONE)
         return await self.async_step_phone()
 

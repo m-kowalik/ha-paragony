@@ -1,6 +1,13 @@
 {
   "config": {
     "step": {
+      "user": {
+        "title": "Paragony — wybierz sieć",
+        "menu_options": {
+          "phone": "Żabka (Żappka)",
+          "lidl": "Lidl Plus"
+        }
+      },
       "phone": {
         "title": "Żabka — numer telefonu",
         "description": "Podaj numer telefonu przypisany do konta Żappka. Wyślemy SMS z kodem.",
@@ -14,16 +21,25 @@
         "data": {
           "code": "Kod"
         }
+      },
+      "lidl": {
+        "title": "Lidl Plus — logowanie",
+        "description": "1. Na komputerze otwórz w przeglądarce narzędzia deweloperskie (F12), zakładkę **Sieć** (Network), i zaznacz *Zachowaj dziennik* (Preserve log).\n2. W tej samej karcie otwórz [stronę logowania Lidla]({url}) i zaloguj się na konto Lidl Plus.\n3. Na końcu przeglądarka spróbuje otworzyć adres zaczynający się od `com.lidlplus.app://callback?code=…` — znajdź go w zakładce Sieć (nagłówek `Location` ostatniego przekierowania albo nieudane żądanie) i wklej poniżej.\n\nKod jest jednorazowy i ważny kilka minut.",
+        "data": {
+          "callback_url": "Adres z kodem (com.lidlplus.app://callback?code=…)"
+        }
       }
     },
     "error": {
       "invalid_phone": "Nieprawidłowy numer — podaj 9 cyfr.",
       "invalid_code": "Nieprawidłowy kod SMS.",
-      "cannot_connect": "Nie udało się połączyć z Żappką."
+      "cannot_connect": "Nie udało się połączyć z usługą sieci.",
+      "invalid_auth_code": "Nieprawidłowy lub wygasły kod — zaloguj się ponownie z linku (został wygenerowany od nowa)."
     },
     "abort": {
       "already_configured": "To konto jest już skonfigurowane.",
-      "reauth_successful": "Ponowne logowanie powiodło się."
+      "reauth_successful": "Ponowne logowanie powiodło się.",
+      "wrong_account": "Zalogowano na inne konto niż skonfigurowane."
     }
   },
   "entity": {

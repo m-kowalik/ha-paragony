@@ -1,6 +1,13 @@
 {
   "config": {
     "step": {
+      "user": {
+        "title": "Paragony — choose a chain",
+        "menu_options": {
+          "phone": "Żabka (Żappka)",
+          "lidl": "Lidl Plus"
+        }
+      },
       "phone": {
         "title": "Żabka — phone number",
         "description": "Enter the phone number of your Żappka account. An SMS code will be sent.",
@@ -14,16 +21,25 @@
         "data": {
           "code": "Code"
         }
+      },
+      "lidl": {
+        "title": "Lidl Plus — log in",
+        "description": "1. On a computer, open developer tools (F12) in the browser, **Network** tab, and enable *Preserve log*.\n2. Open [the Lidl login page]({url}) in the same tab and log in to your Lidl Plus account.\n3. At the end the browser will try to open an address starting with `com.lidlplus.app://callback?code=…` — find it in the Network tab (the `Location` header of the last redirect, or a failed request) and paste it below.\n\nThe code is single-use and valid for a few minutes.",
+        "data": {
+          "callback_url": "Address with the code (com.lidlplus.app://callback?code=…)"
+        }
       }
     },
     "error": {
       "invalid_phone": "Invalid number — enter 9 digits.",
       "invalid_code": "Invalid SMS code.",
-      "cannot_connect": "Could not connect to Żappka."
+      "cannot_connect": "Could not connect to the chain's service.",
+      "invalid_auth_code": "Invalid or expired code — log in again using the link (it has been regenerated)."
     },
     "abort": {
       "already_configured": "This account is already configured.",
-      "reauth_successful": "Re-authentication was successful."
+      "reauth_successful": "Re-authentication was successful.",
+      "wrong_account": "You logged in to a different account than the one configured."
     }
   },
   "entity": {

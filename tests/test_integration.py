@@ -11,9 +11,11 @@ from homeassistant.data_entry_flow import FlowResultType
 
 from custom_components.paragony.const import DOMAIN, EVENT_NEW_RECEIPT
 from custom_components.paragony.providers.base import ProviderAuthError
+from custom_components.paragony.providers.lidl import build_receipt as build_lidl_receipt
 from custom_components.paragony.providers.zabka import build_receipt
 
 PROVIDER = "custom_components.paragony.providers.zabka.ZabkaProvider"
+LIDL_PROVIDER = "custom_components.paragony.providers.lidl.LidlProvider"
 
 
 @pytest.fixture(autouse=True)
@@ -34,6 +36,8 @@ async def test_config_flow(hass: HomeAssistant) -> None:
         patch("custom_components.paragony.async_setup_entry", AsyncMock(return_value=True)),
     ):
         result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
+        assert result["type"] is FlowResultType.MENU
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], {"next_step_id": "phone"})
         assert result["step_id"] == "phone"
         result = await hass.config_entries.flow.async_configure(result["flow_id"], {"phone": "12"})
         assert result["errors"] == {"phone": "invalid_phone"}
@@ -188,3 +192,58 @@ async def test_options_restock_adds_to_todo(hass: HomeAssistant, zabka_fixture) 
     await hass.async_block_till_done()
     assert registry.async_get(number_id) is None and registry.async_get(sensor_id) is None
     assert await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_lidl_config_flow(hass: HomeAssistant) -> None:
+    with (
+        patch(
+            f"{LIDL_PROVIDER}.async_exchange_code",
+            AsyncMock(side_effect=[ProviderAuthError("x"), "lidl-refresh"]),
+        ) as exchange,
+        patch(f"{LIDL_PROVIDER}.account_id", "konto-1"),
+        patch("custom_components.paragony.async_setup_entry", AsyncMock(return_value=True)),
+    ):
+        result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], {"next_step_id": "lidl"})
+        assert result["step_id"] == "lidl"
+        first_url = result["description_placeholders"]["url"]
+        assert first_url.startswith("https://accounts.lidl.com/connect/authorize?")
+
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], {"callback_url": "zly"})
+        assert result["errors"] == {"callback_url": "invalid_auth_code"}
+        # po nieudanej próbie generowany jest nowy link (nowe PKCE)
+        assert result["description_placeholders"]["url"] != first_url
+
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"callback_url": "com.lidlplus.app://callback?code=KOD&scope=openid"}
+        )
+
+    assert exchange.await_args.args[0] == "KOD"
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"] == {"chain": "lidl", "refresh_token": "lidl-refresh"}
+    assert result["result"].unique_id == "lidl_konto-1"
+
+
+async def test_lidl_setup_and_search(hass: HomeAssistant, lidl_fixture) -> None:
+    receipts = {r.external_id: r for r in map(build_lidl_receipt, (lidl_fixture["html"], lidl_fixture["native"]))}
+    await hass.config.async_set_time_zone("Europe/Warsaw")
+    entry = MockConfigEntry(domain=DOMAIN, unique_id="lidl_konto-1", data={"chain": "lidl", "refresh_token": "old"})
+    entry.add_to_hass(hass)
+
+    with (
+        patch(f"{LIDL_PROVIDER}.async_list_receipt_ids", AsyncMock(return_value=list(receipts))),
+        patch(f"{LIDL_PROVIDER}.async_get_receipt", AsyncMock(side_effect=receipts.__getitem__)),
+        patch(f"{LIDL_PROVIDER}.refresh_token", "rotated"),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+    assert entry.state is ConfigEntryState.LOADED
+    assert entry.data["refresh_token"] == "rotated"
+
+    response = await hass.services.async_call(
+        DOMAIN, "search", {"product": "brokuł", "chain": "lidl"}, blocking=True, return_response=True
+    )
+    assert response["count"] == 1
+    assert response["items"][0]["price"] == 6.98
+    assert response["items"][0]["purchased_at"].startswith("2025-06-10T18:30:00")

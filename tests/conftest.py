@@ -17,3 +17,8 @@ sys.modules.setdefault("paragony", pkg)
 @pytest.fixture
 def zabka_fixture() -> dict:
     return json.loads((Path(__file__).parent / "fixtures" / "zabka_receipt.json").read_text())
+
+
+@pytest.fixture
+def lidl_fixture() -> dict:
+    return json.loads((Path(__file__).parent / "fixtures" / "lidl_receipts.json").read_text())

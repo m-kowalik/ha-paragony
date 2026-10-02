@@ -4,21 +4,27 @@ Custom integration pobierająca e-paragony z aplikacji sieci handlowych i zapisu
 każdą pozycję (produkt, ilość, cena po rabacie, data, sklep) w lokalnej bazie SQLite
 `/config/paragony.db`.
 
-Obsługiwane sieci: **Żabka (Żappka)**. W planach: Lidl Plus, Biedronka.
+Obsługiwane sieci: **Żabka (Żappka)**, **Lidl Plus**. W planach: Biedronka.
 
-> Integracja korzysta z nieoficjalnego API aplikacji Żappka — może przestać działać po zmianach po stronie Żabki.
+> Integracja korzysta z nieoficjalnych API aplikacji Żappka i Lidl Plus — może przestać działać po zmianach po stronie sieci.
 
 ## Instalacja (HACS)
 1. HACS → ⋮ → *Custom repositories* → URL tego repozytorium, typ *Integration*.
 2. Zainstaluj „Paragony” i zrestartuj Home Assistant.
-3. Ustawienia → Urządzenia i usługi → Dodaj integrację → **Paragony** → numer telefonu → kod SMS.
+3. Ustawienia → Urządzenia i usługi → Dodaj integrację → **Paragony** → wybierz sieć:
+   - **Żabka** — numer telefonu → kod SMS,
+   - **Lidl Plus** — logowanie na stronie Lidla z linku w kreatorze; po zalogowaniu przeglądarka próbuje otworzyć
+     `com.lidlplus.app://callback?code=…` — ten adres trzeba skopiować z narzędzi deweloperskich (F12 → Sieć,
+     z zaznaczonym „Zachowaj dziennik”) i wkleić w kreatorze. Kod jest jednorazowy i ważny kilka minut.
+
+Każda sieć to osobny wpis integracji; encje mają prefiks sieci (`sensor.zabka_…`, `sensor.lidl_…`).
 
 Przy pierwszej synchronizacji importowana jest cała dostępna historia, potem co 6 h tylko nowe paragony.
 
 ## Encje
 | Encja | Opis |
 |---|---|
-| `sensor.zabka_ostatni_zakup` | kwota ostatniego paragonu; atrybuty: data, sklep, adres, lista pozycji |
+| `sensor.zabka_ostatni_zakup` (analogicznie `sensor.lidl_…`) | kwota ostatniego paragonu; atrybuty: data, sklep, adres, lista pozycji |
 | `sensor.zabka_data_ostatniego_zakupu` | znacznik czasu ostatniego zakupu |
 | `sensor.zabka_wydatki_w_tym_miesiacu` | suma paragonów od 1. dnia miesiąca (atrybut `receipts`) |
 | `sensor.zabka_liczba_paragonow` | liczba paragonów w bazie |
@@ -46,7 +52,7 @@ data:
   product: cola        # fragment nazwy, bez rozróżniania wielkości liter
   date_from: 2026-09-01
   date_to: 2026-09-30
-  # chain: zabka
+  # chain: zabka | lidl
   # include_deposits: true
   # limit: 100
 response_variable: zakupy
@@ -70,4 +76,4 @@ Kwoty w groszach. Można jej używać np. z integracją SQL.
 python3 -m venv .venv && .venv/bin/pip install pytest-homeassistant-custom-component
 .venv/bin/pytest
 ```
-`tools/zabka_discover.py` — skrypt do ręcznego rozpoznawania API (tokeny w `.secrets/`, poza gitem).
+`tools/zabka_discover.py`, `tools/lidl_discover.py` — skrypty do ręcznego rozpoznawania API (tokeny w `.secrets/`, poza gitem).
