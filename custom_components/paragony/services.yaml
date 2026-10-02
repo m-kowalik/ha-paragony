@@ -1,0 +1,29 @@
+search:
+  fields:
+    product:
+      example: "mleko"
+      selector:
+        text:
+    date_from:
+      selector:
+        date:
+    date_to:
+      selector:
+        date:
+    chain:
+      selector:
+        select:
+          options:
+            - zabka
+    include_deposits:
+      default: false
+      selector:
+        boolean:
+    limit:
+      default: 100
+      selector:
+        number:
+          min: 1
+          max: 5000
+          mode: box
+sync:

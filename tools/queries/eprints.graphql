@@ -1,0 +1,1 @@
+query EPrints($cursor: String) { ePrints(after: $cursor) { ePrints { id type address { streetAddress city } createdAt paymentAmount { __typename ...PriceParts } htmlUrl jsonUrl pdfUrl } totalSavings { __typename ...PriceParts } pagination { cursor } } }  fragment PriceParts on Price { amount currencyCode fractionDigits }

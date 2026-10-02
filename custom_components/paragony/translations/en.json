@@ -1,0 +1,81 @@
+{
+  "config": {
+    "step": {
+      "phone": {
+        "title": "Żabka — phone number",
+        "description": "Enter the phone number of your Żappka account. An SMS code will be sent.",
+        "data": {
+          "phone": "Phone number"
+        }
+      },
+      "code": {
+        "title": "SMS code",
+        "description": "Enter the code sent by SMS to {phone}.",
+        "data": {
+          "code": "Code"
+        }
+      }
+    },
+    "error": {
+      "invalid_phone": "Invalid number — enter 9 digits.",
+      "invalid_code": "Invalid SMS code.",
+      "cannot_connect": "Could not connect to Żappka."
+    },
+    "abort": {
+      "already_configured": "This account is already configured.",
+      "reauth_successful": "Re-authentication was successful."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "last_purchase": {
+        "name": "Last purchase"
+      },
+      "last_purchase_time": {
+        "name": "Last purchase time"
+      },
+      "month_spending": {
+        "name": "Spending this month"
+      },
+      "receipt_count": {
+        "name": "Receipt count"
+      }
+    }
+  },
+  "services": {
+    "search": {
+      "name": "Search purchases",
+      "description": "Searches receipt items (product, price, purchase date).",
+      "fields": {
+        "product": {
+          "name": "Product",
+          "description": "Part of the product name (case-insensitive)."
+        },
+        "date_from": {
+          "name": "From date",
+          "description": "Start of the date range (inclusive)."
+        },
+        "date_to": {
+          "name": "To date",
+          "description": "End of the date range (inclusive)."
+        },
+        "chain": {
+          "name": "Chain",
+          "description": "Limit to a single chain."
+        },
+        "include_deposits": {
+          "name": "Include deposits",
+          "description": "Include packaging deposit lines."
+        },
+        "limit": {
+          "name": "Limit",
+          "description": "Maximum number of items."
+        }
+      }
+    },
+    "sync": {
+      "name": "Synchronize",
+      "description": "Fetches new receipts for all accounts."
+    }
+  }
+}

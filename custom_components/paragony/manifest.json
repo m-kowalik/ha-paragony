@@ -1,0 +1,13 @@
+{
+  "domain": "paragony",
+  "name": "Paragony",
+  "codeowners": [],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/m-kowalik/ha-paragony",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/m-kowalik/ha-paragony/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}

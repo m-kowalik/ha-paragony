@@ -1,0 +1,81 @@
+{
+  "config": {
+    "step": {
+      "phone": {
+        "title": "Żabka — numer telefonu",
+        "description": "Podaj numer telefonu przypisany do konta Żappka. Wyślemy SMS z kodem.",
+        "data": {
+          "phone": "Numer telefonu"
+        }
+      },
+      "code": {
+        "title": "Kod SMS",
+        "description": "Wpisz kod wysłany SMS-em na numer {phone}.",
+        "data": {
+          "code": "Kod"
+        }
+      }
+    },
+    "error": {
+      "invalid_phone": "Nieprawidłowy numer — podaj 9 cyfr.",
+      "invalid_code": "Nieprawidłowy kod SMS.",
+      "cannot_connect": "Nie udało się połączyć z Żappką."
+    },
+    "abort": {
+      "already_configured": "To konto jest już skonfigurowane.",
+      "reauth_successful": "Ponowne logowanie powiodło się."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "last_purchase": {
+        "name": "Ostatni zakup"
+      },
+      "last_purchase_time": {
+        "name": "Data ostatniego zakupu"
+      },
+      "month_spending": {
+        "name": "Wydatki w tym miesiącu"
+      },
+      "receipt_count": {
+        "name": "Liczba paragonów"
+      }
+    }
+  },
+  "services": {
+    "search": {
+      "name": "Szukaj zakupów",
+      "description": "Wyszukuje pozycje z paragonów (produkt, cena, data zakupu).",
+      "fields": {
+        "product": {
+          "name": "Produkt",
+          "description": "Fragment nazwy produktu (wielkość liter bez znaczenia)."
+        },
+        "date_from": {
+          "name": "Od dnia",
+          "description": "Początek zakresu dat (włącznie)."
+        },
+        "date_to": {
+          "name": "Do dnia",
+          "description": "Koniec zakresu dat (włącznie)."
+        },
+        "chain": {
+          "name": "Sieć",
+          "description": "Ogranicz do jednej sieci."
+        },
+        "include_deposits": {
+          "name": "Uwzględnij kaucje",
+          "description": "Dołącz pozycje kaucji za opakowania."
+        },
+        "limit": {
+          "name": "Limit",
+          "description": "Maksymalna liczba pozycji."
+        }
+      }
+    },
+    "sync": {
+      "name": "Synchronizuj",
+      "description": "Pobiera nowe paragony ze wszystkich kont."
+    }
+  }
+}
