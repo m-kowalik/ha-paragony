@@ -15,7 +15,7 @@ import json
 import re
 import unicodedata
 
-from .const import CHAIN_OTHER, PHOTO_CHAIN_ALIASES
+from .const import CHAIN_OTHER, PHOTO_CHAIN_ALIASES, PHOTO_ID_PREFIX
 from .jpk import clean_name
 from .models import Receipt, ReceiptItem
 
@@ -144,7 +144,7 @@ def _item(raw) -> ReceiptItem:
 def external_id(chain: str, purchased_at: datetime, total: int, receipt_number: str | None) -> str:
     """Stały identyfikator: to samo zdjęcie dodane drugi raz nie zdubluje paragonu."""
     key = f"{chain}|{purchased_at:%Y-%m-%dT%H:%M}|{total}|{receipt_number or ''}"
-    return "photo-" + hashlib.sha256(key.encode()).hexdigest()[:16]
+    return PHOTO_ID_PREFIX + hashlib.sha256(key.encode()).hexdigest()[:16]
 
 
 def build_receipt(data, tz: tzinfo, source: str | None = None) -> PhotoResult:

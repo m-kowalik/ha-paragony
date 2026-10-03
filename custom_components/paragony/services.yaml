@@ -36,6 +36,7 @@ search:
             - castorama
             - obi
             - inne
+            - photo
     include_deposits:
       default: false
       selector:

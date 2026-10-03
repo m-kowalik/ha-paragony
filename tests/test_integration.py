@@ -307,3 +307,50 @@ async def test_add_from_image(hass: HomeAssistant) -> None:
     await hass.services.async_call(DOMAIN, "add_from_image", {"image": image, "allow_mismatch": True}, blocking=True)
     await hass.async_block_till_done()
     assert len(events) == 2 and events[1].data["chain"] == "inne"
+
+
+async def test_photo_entry(hass: HomeAssistant) -> None:
+    """Wpis „Papierowe paragony”: bez logowania, sensory z paragonów ze zdjęć, opcje produktów cyklicznych."""
+    from homeassistant.core import SupportsResponse
+
+    from test_photo import RESPONSE
+
+    await hass.config.async_set_time_zone("Europe/Warsaw")
+
+    async def generate_data(call):
+        return {"conversation_id": "x", "data": RESPONSE}
+
+    hass.services.async_register("ai_task", "generate_data", generate_data, supports_response=SupportsResponse.ONLY)
+
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
+    assert "photo" in result["menu_options"]
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {"next_step_id": "photo"})
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"] == {"chain": "photo"} and result["title"] == "Papierowe paragony"
+    entry = result["result"]
+    await hass.async_block_till_done()
+    assert entry.state is ConfigEntryState.LOADED
+
+    # drugi wpis nie jest potrzebny
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {"next_step_id": "photo"})
+    assert result["type"] is FlowResultType.ABORT and result["reason"] == "already_configured"
+
+    image = {"media_content_id": "media-source://media_source/local/paragon.jpg", "media_content_type": "image/jpeg"}
+    await hass.services.async_call(DOMAIN, "add_from_image", {"image": image}, blocking=True)
+    await hass.async_block_till_done()
+
+    states = {s.entity_id: s for s in hass.states.async_all("sensor")}
+    last = next(s for eid, s in states.items() if eid.startswith("sensor.papierowe_paragony") and "22.47" == s.state)
+    assert last.attributes["chain"] == "biedronka" and last.attributes["store"] == "Biedronka 0000"
+    count = next(s for eid, s in states.items() if eid.startswith("sensor.papierowe_paragony") and eid.endswith("count"))
+    assert count.state == "1"
+
+    found = await hass.services.async_call(DOMAIN, "search", {"chain": "photo"}, blocking=True, return_response=True)
+    assert found["count"] == 4  # bez kaucji
+
+    flow = await hass.config_entries.options.async_init(entry.entry_id)
+    flow = await hass.config_entries.options.async_configure(flow["flow_id"], {"next_step_id": "add_product"})
+    options = flow["data_schema"].schema["item_names"].config["options"]
+    assert "MLEKO 3,2% 1L" in [o["value"] for o in options]
+    assert await hass.config_entries.async_unload(entry.entry_id)

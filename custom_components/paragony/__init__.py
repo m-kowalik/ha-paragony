@@ -18,6 +18,7 @@ from homeassistant.util import dt as dt_util
 from .const import (
     CHAIN_LIDL,
     CHAIN_NAMES,
+    CHAIN_PHOTO,
     CHAIN_ZABKA,
     CONF_CHAIN,
     CONF_REFRESH_TOKEN,
@@ -33,6 +34,7 @@ from .coordinator import ParagonyCoordinator, receipt_event_data
 from .db import ReceiptDB
 from .photo import INSTRUCTIONS, PhotoReceiptError, build_receipt as build_photo_receipt
 from .providers.lidl import LidlProvider
+from .providers.photo import PhotoProvider
 from .providers.zabka import ZabkaProvider
 
 PLATFORMS = [Platform.NUMBER, Platform.SENSOR]
@@ -214,6 +216,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ParagonyConfigEntry) -> 
         provider = ZabkaProvider(session, entry.data[CONF_REFRESH_TOKEN])
     elif chain == CHAIN_LIDL:
         provider = LidlProvider(session, entry.data[CONF_REFRESH_TOKEN])
+    elif chain == CHAIN_PHOTO:
+        provider = PhotoProvider()
     else:
         raise ValueError(f"Nieobsługiwana sieć: {chain}")
 

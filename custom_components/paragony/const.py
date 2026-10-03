@@ -12,6 +12,9 @@ CONF_CALLBACK_URL = "callback_url"
 CHAIN_ZABKA = "zabka"
 CHAIN_LIDL = "lidl"
 CHAIN_OTHER = "inne"
+# wpis „Papierowe paragony” (bez konta w aplikacji): paragony ze zdjęć z dowolnej sieci
+CHAIN_PHOTO = "photo"
+PHOTO_ID_PREFIX = "photo-"
 CHAIN_NAMES = {
     CHAIN_ZABKA: "Żabka",
     CHAIN_LIDL: "Lidl",
@@ -36,6 +39,7 @@ CHAIN_NAMES = {
     "castorama": "Castorama",
     "obi": "OBI",
     CHAIN_OTHER: "Inne",
+    CHAIN_PHOTO: "Papierowe paragony",
 }
 # fragmenty nazwy sprzedawcy (małe litery, bez polskich znaków) → sieć; także nazwy spółek z nagłówka paragonu
 PHOTO_CHAIN_ALIASES: dict[str, tuple[str, ...]] = {

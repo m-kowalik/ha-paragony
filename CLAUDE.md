@@ -39,8 +39,9 @@ Custom integration Home Assistant pobierająca e-paragony z aplikacji sieci hand
   - Odpowiedź modelu jest zwięzła: pozycje to tablice `[nazwa, ilość, wartość, rabat, "p"|"k"]`, bo pełne obiekty przekraczały limit tokenów. Pozycje jako obiekty też są akceptowane. Zweryfikowane na prawdziwym e-paragonie Biedronki (31 pozycji, suma co do grosza, Gemini 3 Flash, około 40 s). Gemini liczy „myślenie” do `max_tokens`, więc przy 1000 dostawał `MAX_TOKENS` (u mnie podniesione do 19400).
   - Akcja `paragony.add_from_image` (`SupportsResponse.OPTIONAL`) woła `ai_task.generate_data` z załącznikiem z media source. Celowo bez `structure`: model zwraca JSON w tekście, bo zagnieżdżona lista pozycji nie przechodzi przez selektory u wszystkich dostawców.
   - Duplikaty: `db.find_similar` (ta sama suma ±10 min, dowolna sieć), więc zdjęcie e-paragonu z Żabki/Lidla nie zdubluje wpisu.
+  - Wpis „Papierowe paragony” (od 0.5): `chain = photo`, `unique_id = photo`, `providers/photo.py` bez API (pusta lista ID). `db._chain_filter` zamienia `photo` na `external_id LIKE 'photo-%'` w `stats`, `search` i `known_ids`, więc sensory i filtr obejmują paragony ze zdjęć z dowolnej sieci.
   - Po zapisie: event `paragony_new_receipt` i `coordinator.async_update_local()` dla wszystkich wpisów (statystyki i terminy bez odpytywania API).
-- `config_flow.py`: menu wyboru sieci (`user` → `phone` | `lidl`), reauth wraca do kroku właściwej sieci.
+- `config_flow.py`: menu wyboru sieci (`user` → `phone` | `lidl` | `photo`), reauth wraca do kroku właściwej sieci.
   - Żabka: numer telefonu → kod SMS → `entry.data = {chain, phone, refresh_token}`, `unique_id` = `zabka_<numer>`.
   - Lidl: link PKCE → użytkownik wkleja adres `com.lidlplus.app://callback?code=…` → `entry.data = {chain, refresh_token}`, `unique_id` = `lidl_<sub z access tokenu>`. Po błędzie generowane jest nowe PKCE, bo kod jest jednorazowy.
 

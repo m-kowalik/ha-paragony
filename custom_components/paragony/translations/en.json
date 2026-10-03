@@ -5,7 +5,8 @@
         "title": "Paragony — choose a chain",
         "menu_options": {
           "phone": "Żabka (Żappka)",
-          "lidl": "Lidl Plus"
+          "lidl": "Lidl Plus",
+          "photo": "Paper receipts (photos)"
         }
       },
       "phone": {
@@ -88,7 +89,7 @@
         },
         "chain": {
           "name": "Chain",
-          "description": "Limit to a single chain."
+          "description": "Limit to a single chain (photo = all receipts added from photos)."
         },
         "include_deposits": {
           "name": "Include deposits",
@@ -106,7 +107,7 @@
     },
     "add_from_image": {
       "name": "Add receipt from photo",
-      "description": "Reads a paper receipt from a photo using AI Task and saves it to the database. The chain is recognised from the seller name; duplicates of already imported receipts (same total within 10 minutes) are skipped.",
+      "description": "Reads a paper receipt from a photo using AI Task and saves it to the database. The chain is recognised from the seller name; duplicates of already imported receipts (same total within 10 minutes) are skipped. Add the “Paper receipts” entry to get sensors and recurring products for them.",
       "fields": {
         "image": {
           "name": "Photo",

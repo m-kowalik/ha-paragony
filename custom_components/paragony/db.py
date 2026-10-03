@@ -7,6 +7,7 @@ import threading
 from datetime import datetime, timedelta, timezone
 from statistics import median
 
+from .const import CHAIN_PHOTO, PHOTO_ID_PREFIX
 from .models import Receipt
 
 SCHEMA = """
@@ -60,6 +61,14 @@ def _iso_utc(value: datetime) -> str:
     return value.astimezone(timezone.utc).isoformat(timespec="seconds")
 
 
+def _chain_filter(chain: str, alias: str = "") -> tuple[str, tuple]:
+    """Warunek SQL dla sieci; CHAIN_PHOTO oznacza paragony ze zdjęć z dowolnej sieci."""
+    prefix = f"{alias}." if alias else ""
+    if chain == CHAIN_PHOTO:
+        return f"{prefix}external_id LIKE ?", (f"{PHOTO_ID_PREFIX}%",)
+    return f"{prefix}chain = ?", (chain,)
+
+
 def _casefold(value: str | None) -> str | None:
     return value.casefold() if value is not None else None
 
@@ -80,7 +89,8 @@ class ReceiptDB:
 
     def known_ids(self, chain: str) -> set[str]:
         with self._lock:
-            rows = self._conn.execute("SELECT external_id FROM receipts WHERE chain = ?", (chain,))
+            where, args = _chain_filter(chain)
+            rows = self._conn.execute(f"SELECT external_id FROM receipts WHERE {where}", args)
             return {row[0] for row in rows}
 
     def insert(self, receipt: Receipt) -> bool:
@@ -150,8 +160,9 @@ class ReceiptDB:
             where.append("r.purchased_at < ?")
             args.append(_iso_utc(end))
         if chain:
-            where.append("r.chain = ?")
-            args.append(chain)
+            condition, condition_args = _chain_filter(chain, "r")
+            where.append(condition)
+            args.extend(condition_args)
         if not include_deposits:
             where.append("i.kind = 'product'")
         sql = f"""SELECT r.purchased_at, r.chain, r.store_name, r.store_address, r.external_id,
@@ -165,16 +176,17 @@ class ReceiptDB:
 
     def stats(self, chain: str, month_start: datetime) -> dict:
         """Dane dla sensorów: ostatni paragon, liczba paragonów, wydatki od początku miesiąca."""
+        where, args = _chain_filter(chain)
         with self._lock:
             last = self._conn.execute(
-                "SELECT * FROM receipts WHERE chain = ? ORDER BY purchased_at DESC LIMIT 1", (chain,)
+                f"SELECT * FROM receipts WHERE {where} ORDER BY purchased_at DESC LIMIT 1", args
             ).fetchone()
             count, month_total, month_count = self._conn.execute(
-                """SELECT COUNT(*),
+                f"""SELECT COUNT(*),
                           COALESCE(SUM(CASE WHEN purchased_at >= ? THEN total END), 0),
                           COUNT(CASE WHEN purchased_at >= ? THEN 1 END)
-                   FROM receipts WHERE chain = ?""",
-                (_iso_utc(month_start), _iso_utc(month_start), chain),
+                   FROM receipts WHERE {where}""",
+                (_iso_utc(month_start), _iso_utc(month_start), *args),
             ).fetchone()
             last_items = []
             if last is not None:
@@ -192,6 +204,7 @@ class ReceiptDB:
             "month_count": month_count,
             "last": (
                 {
+                    "chain": last["chain"],
                     "external_id": last["external_id"],
                     "purchased_at": last["purchased_at"],
                     "store_name": last["store_name"],

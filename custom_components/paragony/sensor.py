@@ -32,6 +32,7 @@ def _last_attrs(data: dict) -> dict:
         return {}
     return {
         "purchased_at": last["purchased_at"],
+        "chain": last["chain"],
         "store": last["store_name"],
         "address": last["store_address"],
         "items": [

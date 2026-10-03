@@ -1,4 +1,4 @@
-"""Kreator konfiguracji: wybór sieci → Żabka: numer telefonu i kod SMS / Lidl: logowanie w przeglądarce."""
+"""Kreator konfiguracji: wybór sieci → Żabka: numer telefonu i kod SMS / Lidl: logowanie w przeglądarce / papierowe paragony."""
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -29,6 +29,7 @@ from homeassistant.util import dt as dt_util
 from .const import (
     CHAIN_LIDL,
     CHAIN_NAMES,
+    CHAIN_PHOTO,
     CHAIN_ZABKA,
     CONF_CALLBACK_URL,
     CONF_CHAIN,
@@ -68,7 +69,7 @@ class ParagonyConfigFlow(ConfigFlow, domain=DOMAIN):
         self._pkce: tuple[str, str] | None = None
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
-        return self.async_show_menu(step_id="user", menu_options=["phone", "lidl"])
+        return self.async_show_menu(step_id="user", menu_options=["phone", "lidl", "photo"])
 
     async def async_step_phone(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         errors: dict[str, str] = {}
@@ -159,6 +160,12 @@ class ParagonyConfigFlow(ConfigFlow, domain=DOMAIN):
             description_placeholders={"url": login_url(challenge)},
             errors=errors,
         )
+
+    async def async_step_photo(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        """Paragony ze zdjęć: bez logowania, jeden wpis na instalację."""
+        await self.async_set_unique_id(CHAIN_PHOTO)
+        self._abort_if_unique_id_configured()
+        return self.async_create_entry(title=CHAIN_NAMES[CHAIN_PHOTO], data={CONF_CHAIN: CHAIN_PHOTO})
 
     async def async_step_reauth(self, entry_data: Mapping[str, Any]) -> ConfigFlowResult:
         if entry_data.get(CONF_CHAIN) == CHAIN_LIDL:

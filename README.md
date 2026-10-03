@@ -53,7 +53,7 @@ data:
   product: cola        # fragment nazwy, bez rozróżniania wielkości liter
   date_from: 2026-09-01
   date_to: 2026-09-30
-  # chain: zabka | lidl | biedronka | … | inne
+  # chain: zabka | lidl | biedronka | … | inne | photo (wszystkie ze zdjęć)
   # include_deposits: true
   # limit: 100
 response_variable: zakupy
@@ -81,6 +81,10 @@ response_variable: paragon
 - Paragon z tą samą sumą w promieniu 10 minut od już zapisanego (np. e-paragonu) jest pomijany jako duplikat.
 - Gdy suma pozycji różni się od sumy paragonu, akcja zgłasza błąd (sprawdź wynik z `dry_run`).
 - Odpowiedź: `saved`, `duplicate_of`, `mismatch` (PLN) i `receipt` z pozycjami.
+- Akcja działa bez żadnego wpisu, ale warto dodać wpis **Papierowe paragony** (Dodaj wpis → Papierowe paragony,
+  bez logowania). Daje sensory dla paragonów ze zdjęć (ostatni zakup z siecią i sklepem, wydatki w miesiącu,
+  liczba paragonów) i własne opcje produktów cyklicznych. W `paragony.search` filtr `chain: photo` zwraca
+  wszystkie pozycje z paragonów ze zdjęć.
 
 ## Event
 `paragony_new_receipt` — po każdym nowym paragonie (poza pierwszym importem historii), także ze zdjęcia:
