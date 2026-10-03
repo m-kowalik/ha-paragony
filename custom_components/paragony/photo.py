@@ -2,7 +2,8 @@
 
 Zdjęcie odczytuje model przez ``ai_task.generate_data``. Odpowiedź to JSON opisany w ``INSTRUCTIONS``.
 Celowo nie używamy ``structure``: zagnieżdżona lista pozycji nie przechodzi przez selektory
-we wszystkich dostawcach, a sam JSON w tekście działa wszędzie.
+we wszystkich dostawcach, a sam JSON w tekście działa wszędzie. Pozycje są tablicami,
+nie obiektami, bo długi paragon w pełnym formacie przekraczał limit tokenów odpowiedzi (Gemini: MAX_TOKENS).
 """
 from __future__ import annotations
 
@@ -19,34 +20,22 @@ from .jpk import clean_name
 from .models import Receipt, ReceiptItem
 
 INSTRUCTIONS = """\
-Odczytaj polski paragon fiskalny ze zdjęcia. Odpowiedz wyłącznie obiektem JSON, bez komentarzy i bez bloku ```:
-{
-  "store_name": "nazwa sprzedawcy lub sklepu z nagłówka",
-  "store_address": "ulica i numer, kod pocztowy miasto" albo null,
-  "nip": "NIP sprzedawcy, same cyfry" albo null,
-  "purchased_at": "RRRR-MM-DD GG:MM" (data i godzina sprzedaży z paragonu),
-  "receipt_number": "numer wydruku / paragonu" albo null,
-  "total": suma do zapłaty (SUMA PLN) jako liczba,
-  "currency": "PLN",
-  "items": [
-    {
-      "name": "nazwa towaru dokładnie jak na paragonie, bez litery stawki VAT",
-      "quantity": ilość (liczba, np. 1 albo 0.456),
-      "unit": "szt." albo "kg" albo null,
-      "unit_price": cena jednostkowa,
-      "total_price": wartość pozycji przed rabatem,
-      "discount": suma rabatów do tej pozycji jako liczba dodatnia (0, gdy brak),
-      "kind": "product" albo "deposit" (kaucja za opakowanie zwrotne)
-    }
-  ]
-}
+Odczytaj polski paragon ze zdjęcia. Odpowiedz wyłącznie zwięzłym JSON-em w jednej linii, bez spacji \
+między elementami, bez komentarzy i bez bloku ```. Format:
+{"store":"nazwa sieci lub sklepu (z numerem sklepu, jeśli jest)",\
+"address":"adres sklepu, a nie siedziby spółki (gdy brak, adres sprzedawcy)","nip":"same cyfry",\
+"date":"RRRR-MM-DD GG:MM","number":"numer paragonu lub transakcji","total":173.26,\
+"items":[["nazwa",ilość,wartość,rabat,"p"],...]}
+Każda pozycja to tablica [nazwa, ilość, wartość, rabat, typ]:
+- nazwa dokładnie jak na paragonie, bez litery stawki VAT,
+- ilość jako liczba (1 albo 0.456),
+- wartość pozycji przed rabatem (kolumna Wartość),
+- rabat jako liczba dodatnia (0, gdy brak); rabat wydrukowany pod pozycją należy do niej,
+- typ "p" dla towaru albo "k" dla kaucji / opakowania zwrotnego.
 Zasady:
-- Kwoty jako liczby z kropką dziesiętną (3.49), nie tekst.
-- Rabat lub promocja wydrukowana pod pozycją należy do tej pozycji (pole discount), nie jest osobną pozycją.
-- Pozycje anulowane (storno) pomiń.
-- Kaucje i opakowania zwrotne podaj jako pozycje z "kind": "deposit".
-- Nie dodawaj podsumowań VAT, płatności, reszty ani punktów lojalnościowych jako pozycji.
-- Jeśli zdjęcie nie przedstawia paragonu, zwróć {"error": "krótki opis po polsku"}.
+- Kwoty jako liczby z kropką dziesiętną. Brakujące pola tekstowe jako null.
+- Pozycje anulowane (storno) pomiń. Nie dodawaj podsumowań VAT, płatności, reszty ani punktów.
+- Jeśli zdjęcie nie przedstawia paragonu, zwróć {"error":"krótki opis po polsku"}.
 """
 
 _JSON_BLOCK = re.compile(r"\{.*\}", re.DOTALL)
@@ -127,24 +116,28 @@ def _purchased_at(value, tz: tzinfo) -> datetime:
     raise PhotoReceiptError(f"Niepoprawna data zakupu: {value!r}")
 
 
-def _item(raw: dict) -> ReceiptItem:
+def _item(raw) -> ReceiptItem:
+    """Pozycja jako tablica [nazwa, ilość, wartość, rabat, typ] albo obiekt z tymi polami."""
+    if isinstance(raw, (list, tuple)):
+        raw = dict(zip(("name", "quantity", "total_price", "discount", "kind"), raw))
+    elif not isinstance(raw, dict):
+        raise PhotoReceiptError(f"Niepoprawna pozycja: {raw!r}")
     name = str(raw.get("name") or "").strip()
     if not name:
         raise PhotoReceiptError("Pozycja bez nazwy")
     quantity = _quantity(raw.get("quantity"))
     total = _grosze(raw.get("total_price"), "total_price")
     unit_price = _grosze(raw.get("unit_price"), "unit_price") or round(total / quantity if quantity else total)
-    unit = raw.get("unit") or None
     return ReceiptItem(
         name=clean_name(name),
         raw_name=name,
         quantity=quantity,
-        unit=unit,
+        unit=raw.get("unit") or ("szt." if quantity.is_integer() else "kg"),
         unit_price=unit_price,
         total_price=total,
         # rabat zawsze dodatni, niezależnie od znaku zwróconego przez model
         discount=abs(_grosze(raw.get("discount"), "discount")),
-        kind="deposit" if raw.get("kind") == "deposit" else "product",
+        kind="deposit" if raw.get("kind") in ("k", "deposit") else "product",
     )
 
 
@@ -162,14 +155,14 @@ def build_receipt(data, tz: tzinfo, source: str | None = None) -> PhotoResult:
     raw_items = parsed.get("items") or []
     if not isinstance(raw_items, list) or not raw_items:
         raise PhotoReceiptError("Brak pozycji na paragonie")
-    items = [_item(raw) for raw in raw_items if isinstance(raw, dict)]
+    items = [_item(raw) for raw in raw_items]
     items_total = sum(item.final_price for item in items)
-    total = _grosze(parsed.get("total"), "total") if parsed.get("total") not in (None, "") else items_total
+    total = _grosze(parsed["total"], "total") if parsed.get("total") not in (None, "") else items_total
 
-    purchased_at = _purchased_at(parsed.get("purchased_at"), tz)
-    store_name = (parsed.get("store_name") or "").strip() or None
-    chain = detect_chain(store_name, parsed.get("chain"))
-    receipt_number = str(parsed["receipt_number"]).strip() if parsed.get("receipt_number") else None
+    purchased_at = _purchased_at(parsed.get("date"), tz)
+    store_name = _text(parsed.get("store"))
+    chain = detect_chain(store_name)
+    receipt_number = _text(parsed.get("number"))
     raw = {key: value for key, value in parsed.items() if key != "items"}
     raw["source"] = "photo"
     if source:
@@ -180,11 +173,14 @@ def build_receipt(data, tz: tzinfo, source: str | None = None) -> PhotoResult:
             external_id=external_id(chain, purchased_at, total, receipt_number),
             purchased_at=purchased_at,
             total=total,
-            currency=(parsed.get("currency") or "PLN").upper(),
             store_name=store_name,
-            store_address=(parsed.get("store_address") or "").strip() or None,
+            store_address=_text(parsed.get("address")),
             items=items,
             raw=raw,
         ),
         items_total=items_total,
     )
+
+
+def _text(value) -> str | None:
+    return str(value).strip() or None if value is not None else None

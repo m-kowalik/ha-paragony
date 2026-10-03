@@ -132,9 +132,13 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
             task["entity_id"] = entity_id
         if not hass.services.has_service("ai_task", "generate_data"):
             raise ServiceValidationError("Brak integracji AI Task — skonfiguruj encję ai_task (np. Google Gemini)")
-        response = await hass.services.async_call(
-            "ai_task", "generate_data", task, blocking=True, return_response=True
-        )
+        try:
+            response = await hass.services.async_call(
+                "ai_task", "generate_data", task, blocking=True, return_response=True
+            )
+        except HomeAssistantError as err:
+            hint = " Zwiększ maksymalną liczbę tokenów w ustawieniach encji AI Task." if "MAX_TOKENS" in str(err) else ""
+            raise HomeAssistantError(f"AI Task nie odczytał zdjęcia: {err}{hint}") from err
         try:
             result = build_photo_receipt(
                 (response or {}).get("data"), dt_util.get_default_time_zone(), image["media_content_id"]

@@ -284,7 +284,8 @@ async def test_add_from_image(hass: HomeAssistant) -> None:
 
     response = await hass.services.async_call(DOMAIN, "add_from_image", {"image": image}, blocking=True, return_response=True)
     assert response["saved"] is True
-    assert len(events) == 1 and events[0].data["store"].startswith("Jeronimo Martins")
+    await hass.async_block_till_done()
+    assert len(events) == 1 and events[0].data["store"] == "Biedronka 0000"
     assert "entity_id" not in tasks[1]
 
     found = await hass.services.async_call(
@@ -296,11 +297,13 @@ async def test_add_from_image(hass: HomeAssistant) -> None:
     # to samo zdjęcie drugi raz → wykryty duplikat, bez zapisu
     response = await hass.services.async_call(DOMAIN, "add_from_image", {"image": image}, blocking=True, return_response=True)
     assert response["saved"] is False and response["duplicate_of"]["chain"] == "biedronka"
+    await hass.async_block_till_done()
     assert len(events) == 1
 
     # bez return_response akcja też działa (np. z automatyzacji)
-    answers.append({"store_name": "Sklep", "purchased_at": "2026-09-01 10:00", "total": 10, "items": [{"name": "X", "total_price": 9}]})
+    answers.append({"store": "Sklep", "date": "2026-09-01 10:00", "total": 10, "items": [["X", 1, 9, 0, "p"]]})
     with pytest.raises(HomeAssistantError, match="nie zgadza się"):
         await hass.services.async_call(DOMAIN, "add_from_image", {"image": image}, blocking=True)
     await hass.services.async_call(DOMAIN, "add_from_image", {"image": image, "allow_mismatch": True}, blocking=True)
+    await hass.async_block_till_done()
     assert len(events) == 2 and events[1].data["chain"] == "inne"

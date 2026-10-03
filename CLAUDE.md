@@ -36,6 +36,7 @@ Custom integration Home Assistant pobierająca e-paragony z aplikacji sieci hand
   - produkty są w bazie, nie w `entry.options` (tam tylko `todo_entity`). `OptionsFlow` po zmianie robi `async_schedule_reload`, a przy usuwaniu kasuje encje z rejestru.
 - Paragony ze zdjęć (od 0.4):
   - `photo.py` (czysta logika): `INSTRUCTIONS` dla modelu, `build_receipt(data, tz, source)` → `PhotoResult` (`receipt`, `items_total`, `mismatch`), `detect_chain` (aliasy w `const.PHOTO_CHAIN_ALIASES`, nieznane → `inne`), `external_id` = `photo-<hash(sieć, minuta, suma, nr paragonu)>`.
+  - Odpowiedź modelu jest zwięzła: pozycje to tablice `[nazwa, ilość, wartość, rabat, "p"|"k"]`, bo pełne obiekty przekraczały limit tokenów. Pozycje jako obiekty też są akceptowane. Zweryfikowane na prawdziwym e-paragonie Biedronki (31 pozycji, suma co do grosza, Gemini 3 Flash, około 40 s). Gemini liczy „myślenie” do `max_tokens`, więc przy 1000 dostawał `MAX_TOKENS` (u mnie podniesione do 19400).
   - Akcja `paragony.add_from_image` (`SupportsResponse.OPTIONAL`) woła `ai_task.generate_data` z załącznikiem z media source. Celowo bez `structure`: model zwraca JSON w tekście, bo zagnieżdżona lista pozycji nie przechodzi przez selektory u wszystkich dostawców.
   - Duplikaty: `db.find_similar` (ta sama suma ±10 min, dowolna sieć), więc zdjęcie e-paragonu z Żabki/Lidla nie zdubluje wpisu.
   - Po zapisie: event `paragony_new_receipt` i `coordinator.async_update_local()` dla wszystkich wpisów (statystyki i terminy bez odpytywania API).
