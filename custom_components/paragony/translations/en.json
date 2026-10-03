@@ -103,6 +103,28 @@
     "sync": {
       "name": "Synchronize",
       "description": "Fetches new receipts for all accounts."
+    },
+    "add_from_image": {
+      "name": "Add receipt from photo",
+      "description": "Reads a paper receipt from a photo using AI Task and saves it to the database. The chain is recognised from the seller name; duplicates of already imported receipts (same total within 10 minutes) are skipped.",
+      "fields": {
+        "image": {
+          "name": "Photo",
+          "description": "Photo of the receipt (e.g. uploaded to My media or a camera snapshot)."
+        },
+        "ai_task_entity": {
+          "name": "AI Task entity",
+          "description": "Model that reads the photo. Defaults to the preferred AI Task entity."
+        },
+        "dry_run": {
+          "name": "Dry run",
+          "description": "Only return the recognised receipt without saving it."
+        },
+        "allow_mismatch": {
+          "name": "Allow mismatch",
+          "description": "Save even when the sum of items differs from the receipt total."
+        }
+      }
     }
   },
   "options": {

@@ -5,6 +5,7 @@ każdą pozycję (produkt, ilość, cena po rabacie, data, sklep) w lokalnej baz
 `/config/paragony.db`.
 
 Obsługiwane sieci: **Żabka (Żappka)**, **Lidl Plus**. W planach: Biedronka.
+Papierowe paragony z dowolnego sklepu można dodać ze zdjęcia (akcja `paragony.add_from_image`, przez AI Task).
 
 > Integracja korzysta z nieoficjalnych API aplikacji Żappka i Lidl Plus — może przestać działać po zmianach po stronie sieci.
 
@@ -52,7 +53,7 @@ data:
   product: cola        # fragment nazwy, bez rozróżniania wielkości liter
   date_from: 2026-09-01
   date_to: 2026-09-30
-  # chain: zabka | lidl
+  # chain: zabka | lidl | biedronka | … | inne
   # include_deposits: true
   # limit: 100
 response_variable: zakupy
@@ -62,8 +63,27 @@ Odpowiedź: `count`, `total` (PLN) i `items` z polami `purchased_at`, `chain`, `
 
 **`paragony.sync`** — natychmiastowa synchronizacja wszystkich kont.
 
+**`paragony.add_from_image`** — papierowy paragon ze zdjęcia. Zdjęcie odczytuje encja
+[AI Task](https://www.home-assistant.io/integrations/ai_task/) z obsługą załączników
+(np. Google Gemini, OpenAI, Anthropic), więc nie potrzeba konta w aplikacji sieci.
+```yaml
+action: paragony.add_from_image
+data:
+  image:
+    media_content_id: media-source://media_source/local/paragon.jpg  # „Moje media” albo media-source://camera/camera.x
+    media_content_type: image/jpeg
+  # ai_task_entity: ai_task.google_ai_task   # domyślnie preferowana encja AI Task
+  # dry_run: true          # tylko odczyt, bez zapisu
+  # allow_mismatch: true   # zapisz mimo różnicy między sumą pozycji a sumą paragonu
+response_variable: paragon
+```
+- Sieć rozpoznawana jest z nazwy sprzedawcy (`biedronka`, `kaufland`, `rossmann`, …, nieznane: `inne`).
+- Paragon z tą samą sumą w promieniu 10 minut od już zapisanego (np. e-paragonu) jest pomijany jako duplikat.
+- Gdy suma pozycji różni się od sumy paragonu, akcja zgłasza błąd (sprawdź wynik z `dry_run`).
+- Odpowiedź: `saved`, `duplicate_of`, `mismatch` (PLN) i `receipt` z pozycjami.
+
 ## Event
-`paragony_new_receipt` — po każdym nowym paragonie (poza pierwszym importem historii):
+`paragony_new_receipt` — po każdym nowym paragonie (poza pierwszym importem historii), także ze zdjęcia:
 `chain`, `receipt_id`, `purchased_at`, `store`, `total`, `currency`, `items[]`.
 
 ## Baza danych

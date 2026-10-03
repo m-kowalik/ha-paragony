@@ -16,6 +16,26 @@ search:
           options:
             - zabka
             - lidl
+            - biedronka
+            - kaufland
+            - auchan
+            - carrefour
+            - dino
+            - netto
+            - aldi
+            - stokrotka
+            - lewiatan
+            - polomarket
+            - intermarche
+            - rossmann
+            - hebe
+            - pepco
+            - action
+            - ikea
+            - leroy_merlin
+            - castorama
+            - obi
+            - inne
     include_deposits:
       default: false
       selector:
@@ -28,3 +48,23 @@ search:
           max: 5000
           mode: box
 sync:
+add_from_image:
+  fields:
+    image:
+      required: true
+      selector:
+        media:
+          accept:
+            - image/*
+    ai_task_entity:
+      selector:
+        entity:
+          domain: ai_task
+    dry_run:
+      default: false
+      selector:
+        boolean:
+    allow_mismatch:
+      default: false
+      selector:
+        boolean:

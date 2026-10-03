@@ -8,6 +8,7 @@ import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse, callback
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.event import async_track_time_interval
@@ -22,12 +23,15 @@ from .const import (
     CONF_REFRESH_TOKEN,
     DB_FILENAME,
     DOMAIN,
+    EVENT_NEW_RECEIPT,
     RESTOCK_INTERVAL,
+    SERVICE_ADD_FROM_IMAGE,
     SERVICE_SEARCH,
     SERVICE_SYNC,
 )
-from .coordinator import ParagonyCoordinator
+from .coordinator import ParagonyCoordinator, receipt_event_data
 from .db import ReceiptDB
+from .photo import INSTRUCTIONS, PhotoReceiptError, build_receipt as build_photo_receipt
 from .providers.lidl import LidlProvider
 from .providers.zabka import ZabkaProvider
 
@@ -45,6 +49,18 @@ SEARCH_SCHEMA = vol.Schema(
         vol.Optional("chain"): vol.In(list(CHAIN_NAMES)),
         vol.Optional("include_deposits", default=False): cv.boolean,
         vol.Optional("limit", default=100): vol.All(vol.Coerce(int), vol.Range(min=1, max=5000)),
+    }
+)
+
+ADD_FROM_IMAGE_SCHEMA = vol.Schema(
+    {
+        vol.Required("image"): vol.Schema(
+            {vol.Required("media_content_id"): cv.string, vol.Optional("media_content_type"): cv.string},
+            extra=vol.ALLOW_EXTRA,
+        ),
+        vol.Optional("ai_task_entity"): cv.entity_domain("ai_task"),
+        vol.Optional("dry_run", default=False): cv.boolean,
+        vol.Optional("allow_mismatch", default=False): cv.boolean,
     }
 )
 
@@ -100,10 +116,89 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         for entry in hass.config_entries.async_loaded_entries(DOMAIN):
             await entry.runtime_data.async_refresh()
 
+    async def async_add_from_image(call: ServiceCall) -> ServiceResponse:
+        image = call.data["image"]
+        task = {
+            "task_name": "paragony_receipt_photo",
+            "instructions": INSTRUCTIONS,
+            "attachments": [
+                {
+                    "media_content_id": image["media_content_id"],
+                    "media_content_type": image.get("media_content_type") or "image/jpeg",
+                }
+            ],
+        }
+        if entity_id := call.data.get("ai_task_entity"):
+            task["entity_id"] = entity_id
+        if not hass.services.has_service("ai_task", "generate_data"):
+            raise ServiceValidationError("Brak integracji AI Task — skonfiguruj encję ai_task (np. Google Gemini)")
+        response = await hass.services.async_call(
+            "ai_task", "generate_data", task, blocking=True, return_response=True
+        )
+        try:
+            result = build_photo_receipt(
+                (response or {}).get("data"), dt_util.get_default_time_zone(), image["media_content_id"]
+            )
+        except PhotoReceiptError as err:
+            raise HomeAssistantError(str(err)) from err
+        receipt = result.receipt
+
+        db = await _async_get_db(hass)
+        duplicate = await hass.async_add_executor_job(db.find_similar, receipt.purchased_at, receipt.total)
+        saved = False
+        if not call.data["dry_run"] and duplicate is None:
+            if result.mismatch and not call.data["allow_mismatch"]:
+                raise HomeAssistantError(
+                    f"Suma pozycji ({result.items_total / 100:.2f}) nie zgadza się z sumą paragonu "
+                    f"({receipt.total / 100:.2f}). Sprawdź wynik z dry_run albo użyj allow_mismatch."
+                )
+            saved = await hass.async_add_executor_job(db.insert, receipt)
+        if saved:
+            hass.bus.async_fire(EVENT_NEW_RECEIPT, receipt_event_data(receipt))
+            for entry in hass.config_entries.async_loaded_entries(DOMAIN):
+                await entry.runtime_data.async_update_local()
+
+        return {
+            "saved": saved,
+            "duplicate_of": (
+                {
+                    "chain": duplicate["chain"],
+                    "receipt_id": duplicate["external_id"],
+                    "store": duplicate["store_name"],
+                }
+                if duplicate
+                else None
+            ),
+            "mismatch": result.mismatch / 100,
+            "receipt": {
+                **receipt_event_data(receipt),
+                "address": receipt.store_address,
+                "items": [
+                    {
+                        "name": i.name,
+                        "kind": i.kind,
+                        "quantity": i.quantity,
+                        "unit": i.unit,
+                        "unit_price": i.unit_price / 100,
+                        "discount": i.discount / 100,
+                        "price": i.final_price / 100,
+                    }
+                    for i in receipt.items
+                ],
+            },
+        }
+
     hass.services.async_register(
         DOMAIN, SERVICE_SEARCH, async_search, schema=SEARCH_SCHEMA, supports_response=SupportsResponse.ONLY
     )
     hass.services.async_register(DOMAIN, SERVICE_SYNC, async_sync)
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_ADD_FROM_IMAGE,
+        async_add_from_image,
+        schema=ADD_FROM_IMAGE_SCHEMA,
+        supports_response=SupportsResponse.OPTIONAL,
+    )
     return True
 
 
@@ -125,7 +220,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ParagonyConfigEntry) -> 
 
     @callback
     def _restock_tick(_now) -> None:
-        entry.async_create_background_task(hass, coordinator.async_update_restock(), "paragony_restock")
+        entry.async_create_background_task(hass, coordinator.async_update_local(), "paragony_restock")
 
     entry.async_on_unload(async_track_time_interval(hass, _restock_tick, RESTOCK_INTERVAL))
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))

@@ -170,7 +170,7 @@ async def test_options_restock_adds_to_todo(hass: HomeAssistant, zabka_fixture) 
     assert added[0]["description"] == "Paragony: ostatnio kupione 15.01, co 7 dni"
 
     coordinator = entry.runtime_data
-    await coordinator.async_update_restock()
+    await coordinator.async_update_local()
     assert len(added) == 1  # tylko raz na cykl
 
     registry = er.async_get(hass)
@@ -247,3 +247,60 @@ async def test_lidl_setup_and_search(hass: HomeAssistant, lidl_fixture) -> None:
     assert response["count"] == 1
     assert response["items"][0]["price"] == 6.98
     assert response["items"][0]["purchased_at"].startswith("2025-06-10T18:30:00")
+
+
+async def test_add_from_image(hass: HomeAssistant) -> None:
+    from homeassistant.core import SupportsResponse
+    from homeassistant.exceptions import HomeAssistantError
+    from homeassistant.setup import async_setup_component
+
+    from test_photo import RESPONSE
+
+    await hass.config.async_set_time_zone("Europe/Warsaw")
+    tasks: list[dict] = []
+    answers = [RESPONSE]
+
+    async def generate_data(call):
+        tasks.append(dict(call.data))
+        return {"conversation_id": "x", "data": answers[-1]}
+
+    hass.services.async_register("ai_task", "generate_data", generate_data, supports_response=SupportsResponse.ONLY)
+    assert await async_setup_component(hass, DOMAIN, {})
+    events = []
+    hass.bus.async_listen(EVENT_NEW_RECEIPT, events.append)
+    image = {"media_content_id": "media-source://media_source/local/paragon.jpg", "media_content_type": "image/jpeg"}
+
+    response = await hass.services.async_call(
+        DOMAIN,
+        "add_from_image",
+        {"image": image, "ai_task_entity": "ai_task.google_ai_task", "dry_run": True},
+        blocking=True,
+        return_response=True,
+    )
+    assert tasks[0]["entity_id"] == "ai_task.google_ai_task"
+    assert tasks[0]["attachments"] == [image]
+    assert response["saved"] is False and response["duplicate_of"] is None
+    assert response["receipt"]["chain"] == "biedronka" and response["receipt"]["total"] == 22.47
+
+    response = await hass.services.async_call(DOMAIN, "add_from_image", {"image": image}, blocking=True, return_response=True)
+    assert response["saved"] is True
+    assert len(events) == 1 and events[0].data["store"].startswith("Jeronimo Martins")
+    assert "entity_id" not in tasks[1]
+
+    found = await hass.services.async_call(
+        DOMAIN, "search", {"chain": "biedronka", "product": "banany"}, blocking=True, return_response=True
+    )
+    assert found["count"] == 1 and found["items"][0]["price"] == 3.49
+    assert found["items"][0]["purchased_at"].startswith("2026-09-30T18:42:00")
+
+    # to samo zdjęcie drugi raz → wykryty duplikat, bez zapisu
+    response = await hass.services.async_call(DOMAIN, "add_from_image", {"image": image}, blocking=True, return_response=True)
+    assert response["saved"] is False and response["duplicate_of"]["chain"] == "biedronka"
+    assert len(events) == 1
+
+    # bez return_response akcja też działa (np. z automatyzacji)
+    answers.append({"store_name": "Sklep", "purchased_at": "2026-09-01 10:00", "total": 10, "items": [{"name": "X", "total_price": 9}]})
+    with pytest.raises(HomeAssistantError, match="nie zgadza się"):
+        await hass.services.async_call(DOMAIN, "add_from_image", {"image": image}, blocking=True)
+    await hass.services.async_call(DOMAIN, "add_from_image", {"image": image, "allow_mismatch": True}, blocking=True)
+    assert len(events) == 2 and events[1].data["chain"] == "inne"

@@ -34,4 +34,4 @@ class IntervalNumber(RestockEntity, NumberEntity):
         await self.hass.async_add_executor_job(
             lambda: self.coordinator.db.update_tracked(self._product_id, interval_days=int(value))
         )
-        await self.coordinator.async_update_restock()
+        await self.coordinator.async_update_local()

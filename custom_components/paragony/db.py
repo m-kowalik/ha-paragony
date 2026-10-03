@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import threading
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from statistics import median
 
 from .models import Receipt
@@ -117,6 +117,17 @@ class ReceiptDB:
                 ],
             )
             return True
+
+    def find_similar(self, purchased_at: datetime, total: int, minutes: int = 10) -> dict | None:
+        """Paragon z tą samą sumą w pobliżu tej godziny (np. ze zdjęcia, gdy jest już e-paragon)."""
+        delta = timedelta(minutes=minutes)
+        with self._lock:
+            row = self._conn.execute(
+                """SELECT chain, external_id, purchased_at, store_name FROM receipts
+                   WHERE total = ? AND purchased_at BETWEEN ? AND ? LIMIT 1""",
+                (total, _iso_utc(purchased_at - delta), _iso_utc(purchased_at + delta)),
+            ).fetchone()
+        return dict(row) if row is not None else None
 
     def search(
         self,

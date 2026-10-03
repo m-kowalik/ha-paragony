@@ -21,10 +21,28 @@ from .const import (
     UPDATE_INTERVAL,
 )
 from .db import ReceiptDB
+from .models import Receipt
 from .restock import evaluate
 from .providers.base import ProviderAuthError, ProviderError, ReceiptProvider
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def receipt_event_data(receipt: Receipt) -> dict:
+    """Dane eventu paragony_new_receipt."""
+    return {
+        "chain": receipt.chain,
+        "receipt_id": receipt.external_id,
+        "purchased_at": dt_util.as_local(receipt.purchased_at).isoformat(),
+        "store": receipt.store_name,
+        "total": receipt.total / 100,
+        "currency": receipt.currency,
+        "items": [
+            {"name": i.name, "quantity": i.quantity, "price": i.final_price / 100}
+            for i in receipt.items
+            if i.kind == "product"
+        ],
+    }
 
 
 class ParagonyCoordinator(DataUpdateCoordinator[dict]):
@@ -53,22 +71,7 @@ class ParagonyCoordinator(DataUpdateCoordinator[dict]):
                 inserted = await self.hass.async_add_executor_job(self.db.insert, receipt)
                 # przy pierwszym imporcie całej historii nie zalewamy automatyzacji eventami
                 if inserted and not initial_import:
-                    self.hass.bus.async_fire(
-                        EVENT_NEW_RECEIPT,
-                        {
-                            "chain": chain,
-                            "receipt_id": receipt.external_id,
-                            "purchased_at": dt_util.as_local(receipt.purchased_at).isoformat(),
-                            "store": receipt.store_name,
-                            "total": receipt.total / 100,
-                            "currency": receipt.currency,
-                            "items": [
-                                {"name": i.name, "quantity": i.quantity, "price": i.final_price / 100}
-                                for i in receipt.items
-                                if i.kind == "product"
-                            ],
-                        },
-                    )
+                    self.hass.bus.async_fire(EVENT_NEW_RECEIPT, receipt_event_data(receipt))
             if new_ids:
                 _LOGGER.info("%s: zapisano %d nowych paragonów", chain, len(new_ids))
         except ProviderAuthError as err:
@@ -78,18 +81,20 @@ class ParagonyCoordinator(DataUpdateCoordinator[dict]):
         finally:
             self._persist_refresh_token()
 
+        return await self._async_local_data()
+
+    async def _async_local_data(self) -> dict:
         month_start = dt_util.start_of_local_day().replace(day=1)
-        data = await self.hass.async_add_executor_job(self.db.stats, chain, month_start)
+        data = await self.hass.async_add_executor_job(self.db.stats, self.provider.chain, month_start)
         data["restock"], data["recent"] = await self._async_restock()
         return data
 
-    async def async_update_restock(self) -> None:
-        """Przelicza terminy zakupów bez odpytywania API sieci (timer, zmiana interwału)."""
+    async def async_update_local(self) -> None:
+        """Przelicza dane z bazy bez odpytywania API sieci (timer, zmiana interwału, paragon ze zdjęcia)."""
         if self.data is None:
             return
-        restock, recent = await self._async_restock()
         # celowo bez async_set_updated_data — ta przesuwa termin kolejnej synchronizacji
-        self.data = {**self.data, "restock": restock, "recent": recent}
+        self.data = await self._async_local_data()
         self.async_update_listeners()
 
     async def _async_restock(self) -> tuple[dict[int, dict], list[dict]]:

@@ -1,6 +1,6 @@
 # Paragony — przewodnik dla Claude Code
 
-Custom integration Home Assistant pobierająca e-paragony z aplikacji sieci handlowych do lokalnej bazy SQLite (`/config/paragony.db`). Obsługiwane sieci: Żabka (Żappka), Lidl Plus. W planach: Biedronka.
+Custom integration Home Assistant pobierająca e-paragony z aplikacji sieci handlowych do lokalnej bazy SQLite (`/config/paragony.db`). Obsługiwane sieci: Żabka (Żappka), Lidl Plus, a papierowe paragony dowolnej sieci ze zdjęć (AI Task). W planach: Biedronka.
 
 ## Architektura (`custom_components/paragony/`)
 - `models.py`: wspólne `Receipt` / `ReceiptItem`. **Kwoty zawsze w groszach (int).** `ReceiptItem.kind` to `product` albo `deposit` (kaucja).
@@ -22,7 +22,7 @@ Custom integration Home Assistant pobierająca e-paragony z aplikacji sieci hand
   - Deduplikacja przez `UNIQUE(chain, external_id)`.
   - `casefold()` jest zarejestrowane jako funkcja SQLite i służy do wyszukiwania bez rozróżniania wielkości liter.
   - Daty zapisywane w UTC (ISO).
-- `coordinator.py`: synchronizacja co 6 h. Pobiera tylko nowe ID. Przy pierwszym imporcie historii **nie** wysyła eventów `paragony_new_receipt`. Zapisuje zrotowany refresh token do `entry.data`.
+- `coordinator.py`: synchronizacja co 6 h. Pobiera tylko nowe ID. `async_update_local` przelicza statystyki i terminy z bazy bez API. Przy pierwszym imporcie historii **nie** wysyła eventów `paragony_new_receipt`. Zapisuje zrotowany refresh token do `entry.data`.
 - `sensor.py`: ostatni zakup (kwota i atrybuty z pozycjami), data ostatniego zakupu, wydatki w bieżącym miesiącu, liczba paragonów.
 - `__init__.py`:
   - akcje `paragony.search` (`SupportsResponse.ONLY`; filtry: `product`, `date_from`/`date_to` w lokalnej strefie, `chain`, `include_deposits`, `limit`) i `paragony.sync`;
@@ -31,9 +31,14 @@ Custom integration Home Assistant pobierająca e-paragony z aplikacji sieci hand
   - tabele `tracked_products` i `tracked_product_names` (nazwa na liście zakupów ↔ nazwy z paragonów; ostatni zakup liczony ze wszystkich sieci);
   - `restock.py` (`evaluate`, czysta logika: termin = ostatni zakup + `interval_days`; dodanie **raz na cykl**, czyli tylko gdy `last_added_at < last_purchased_at`);
   - `coordinator._async_restock` (`todo.get_items`, potem `todo.add_item`, `mark_added`, event `paragony_restock_added`), wołane po synchronizacji, co godzinę i po zmianie `number`;
-  - `async_update_restock` celowo nie używa `async_set_updated_data`, bo ta przesuwa termin synchronizacji;
+  - `async_update_local` celowo nie używa `async_set_updated_data`, bo ta przesuwa termin synchronizacji;
   - `entity.py` (`RestockEntity`, urządzenie „Zakupy cykliczne”), `number.py` (dni) i `RestockSensor` (data);
   - produkty są w bazie, nie w `entry.options` (tam tylko `todo_entity`). `OptionsFlow` po zmianie robi `async_schedule_reload`, a przy usuwaniu kasuje encje z rejestru.
+- Paragony ze zdjęć (od 0.4):
+  - `photo.py` (czysta logika): `INSTRUCTIONS` dla modelu, `build_receipt(data, tz, source)` → `PhotoResult` (`receipt`, `items_total`, `mismatch`), `detect_chain` (aliasy w `const.PHOTO_CHAIN_ALIASES`, nieznane → `inne`), `external_id` = `photo-<hash(sieć, minuta, suma, nr paragonu)>`.
+  - Akcja `paragony.add_from_image` (`SupportsResponse.OPTIONAL`) woła `ai_task.generate_data` z załącznikiem z media source. Celowo bez `structure`: model zwraca JSON w tekście, bo zagnieżdżona lista pozycji nie przechodzi przez selektory u wszystkich dostawców.
+  - Duplikaty: `db.find_similar` (ta sama suma ±10 min, dowolna sieć), więc zdjęcie e-paragonu z Żabki/Lidla nie zdubluje wpisu.
+  - Po zapisie: event `paragony_new_receipt` i `coordinator.async_update_local()` dla wszystkich wpisów (statystyki i terminy bez odpytywania API).
 - `config_flow.py`: menu wyboru sieci (`user` → `phone` | `lidl`), reauth wraca do kroku właściwej sieci.
   - Żabka: numer telefonu → kod SMS → `entry.data = {chain, phone, refresh_token}`, `unique_id` = `zabka_<numer>`.
   - Lidl: link PKCE → użytkownik wkleja adres `com.lidlplus.app://callback?code=…` → `entry.data = {chain, refresh_token}`, `unique_id` = `lidl_<sub z access tokenu>`. Po błędzie generowane jest nowe PKCE, bo kod jest jednorazowy.
